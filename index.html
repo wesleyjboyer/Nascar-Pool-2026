@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NASCAR Pick'em Pool</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --bg:#0a0a0a;--panel:#141414;--p2:#1c1c1c;--brd:#272727;
+  --y:#ffd100;--red:#e8001c;--grn:#00e676;--blu:#2979ff;
+  --txt:#f0f0f0;--mut:#686868;
+  --fh:'Bebas Neue',sans-serif;--fb:'Barlow Condensed',sans-serif;
+  --mob-nav-h:62px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--txt);font-family:var(--fb);font-size:16px;min-height:100vh;overflow-x:hidden}
+
+/* ── TOP LOADING BAR ── */
+#top-bar{position:fixed;top:0;left:0;right:0;height:3px;background:var(--y);z-index:9999;transform:scaleX(0);transform-origin:left;transition:transform .3s ease;pointer-events:none}
+#top-bar.show{transform:scaleX(.7);transition:transform 2s ease}
+#top-bar.done{transform:scaleX(1);transition:transform .2s ease}
+
+/* ── TOAST ── */
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-10px);background:#222;color:var(--txt);border:1px solid var(--brd);border-radius:4px;padding:10px 18px;font-size:13px;font-weight:600;z-index:9998;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--grn);color:var(--grn)}
+#toast.err{border-color:var(--red);color:var(--red)}
+#toast.warn{border-color:var(--y);color:var(--y)}
+
+/* ── SETUP SCREEN ── */
+#setup-screen{position:fixed;inset:0;background:var(--bg);z-index:8000;overflow-y:auto;padding:20px}
+#setup-screen.gone{display:none}
+.setup-inner{max-width:620px;margin:0 auto;padding:20px 0 40px}
+.setup-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.setup-chk{width:36px;height:36px;flex-shrink:0;background-image:linear-gradient(45deg,#fff 25%,transparent 25%),linear-gradient(-45deg,#fff 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#fff 75%),linear-gradient(-45deg,transparent 75%,#fff 75%);background-size:8px 8px;background-position:0 0,0 4px,4px -4px,-4px 0;background-color:#000;border:2px solid var(--y)}
+.setup-logo h1{font-family:var(--fh);font-size:28px;letter-spacing:2px;color:var(--y)}
+.setup-logo h1 span{color:var(--txt)}
+.setup-step{background:var(--panel);border:1px solid var(--brd);border-radius:6px;padding:20px;margin-bottom:16px}
+.setup-step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--y);color:#000;font-family:var(--fh);font-size:15px;margin-right:8px;flex-shrink:0}
+.setup-step-title{font-family:var(--fh);font-size:18px;letter-spacing:1px;color:var(--y);display:flex;align-items:center;margin-bottom:12px}
+.setup-step p{font-size:13px;color:var(--mut);line-height:1.7;margin-bottom:10px}
+.setup-step a{color:var(--y);text-decoration:none}
+.setup-step a:hover{text-decoration:underline}
+.sql-block{background:#000;border:1px solid var(--brd);border-radius:3px;padding:12px;font-family:monospace;font-size:11px;color:#a8d8a8;line-height:1.6;overflow-x:auto;white-space:pre;position:relative}
+.copy-sql{position:absolute;top:8px;right:8px;font-size:10px;padding:3px 8px}
+.setup-fields{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.setup-field label{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px}
+.setup-field input{background:#000;border:1px solid var(--brd);border-radius:3px;color:var(--txt);font-family:monospace;font-size:13px;padding:10px 12px;outline:none;width:100%;transition:border-color .2s}
+.setup-field input:focus{border-color:var(--y)}
+#setup-err{color:var(--red);font-size:13px;margin-top:8px;min-height:18px}
+.setup-connect-btn{width:100%;margin-top:14px;padding:14px;font-size:15px}
+
+/* ── HEADER ── */
+header{background:#000;border-bottom:3px solid var(--y);padding:0 16px;display:flex;align-items:center;gap:10px;height:54px;position:sticky;top:0;z-index:400}
+.chk{width:26px;height:26px;flex-shrink:0;background-image:linear-gradient(45deg,#fff 25%,transparent 25%),linear-gradient(-45deg,#fff 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#fff 75%),linear-gradient(-45deg,transparent 75%,#fff 75%);background-size:7px 7px;background-position:0 0,0 3.5px,3.5px -3.5px,-3.5px 0;background-color:#000;border:2px solid var(--y)}
+header h1{font-family:var(--fh);font-size:22px;letter-spacing:2px;color:var(--y);flex:1}
+header h1 span{color:var(--txt)}
+@media(max-width:400px){header h1 span{display:none}}
+#lpill{display:none;align-items:center;gap:5px;background:rgba(232,0,28,.1);border:1px solid rgba(232,0,28,.3);border-radius:20px;padding:3px 9px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--red)}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 7px var(--red);animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#sync-btn{background:none;border:1px solid var(--brd);border-radius:3px;color:var(--mut);font-size:18px;padding:4px 7px;cursor:pointer;line-height:1;flex-shrink:0}
+#sync-btn:hover{border-color:var(--txt);color:var(--txt)}
+#sync-btn.spin{animation:spinit .8s linear infinite}
+@keyframes spinit{to{transform:rotate(360deg)}}
+#settings-btn{background:none;border:1px solid var(--brd);border-radius:3px;color:var(--mut);font-size:16px;padding:4px 7px;cursor:pointer;line-height:1;flex-shrink:0}
+#settings-btn:hover{border-color:var(--txt);color:var(--txt)}
+
+/* ── DESKTOP NAV ── */
+#desk-nav{display:flex;background:#000;padding:0 16px;border-bottom:1px solid var(--brd);overflow-x:auto;gap:0}
+#desk-nav button{background:none;border:none;color:var(--mut);font-family:var(--fb);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:11px 13px;cursor:pointer;position:relative;transition:color .2s;white-space:nowrap;min-height:44px}
+#desk-nav button:hover{color:var(--txt)}
+#desk-nav button.on{color:var(--y)}
+#desk-nav button.on::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--y)}
+
+/* ── MOBILE BOTTOM NAV ── */
+#mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid var(--y);z-index:400;padding-bottom:env(safe-area-inset-bottom)}
+#mob-nav button{flex:1;background:none;border:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px 4px 6px;cursor:pointer;font-family:var(--fb);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;min-height:var(--mob-nav-h);transition:color .2s}
+#mob-nav button .mico{font-size:20px;line-height:1}
+#mob-nav button.on{color:var(--y)}
+
+/* ── MORE SHEET (mobile) ── */
+#more-sheet{position:fixed;inset:0;z-index:600;pointer-events:none}
+#more-sheet.open{pointer-events:all}
+.ms-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.7);opacity:0;transition:opacity .25s}
+#more-sheet.open .ms-backdrop{opacity:1}
+.ms-panel{position:absolute;bottom:0;left:0;right:0;background:#111;border-top:2px solid var(--y);border-radius:14px 14px 0 0;padding:8px 0 calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1)}
+#more-sheet.open .ms-panel{transform:none}
+.ms-handle{width:36px;height:4px;background:var(--brd);border-radius:2px;margin:8px auto 16px}
+.ms-btn{display:flex;align-items:center;gap:14px;width:100%;background:none;border:none;color:var(--txt);font-family:var(--fb);font-size:16px;font-weight:600;padding:14px 22px;cursor:pointer;text-align:left;transition:background .15s}
+.ms-btn:hover{background:var(--p2)}
+.ms-btn .mico{font-size:22px;width:28px;text-align:center}
+.ms-sep{height:1px;background:var(--brd);margin:6px 0}
+.ms-btn.danger{color:var(--red)}
+
+/* ── MAIN ── */
+main{padding:18px 16px;max-width:1020px;margin:0 auto}
+.tp{display:none}
+.tp.on{display:block;animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── SECTION TITLE ── */
+.st{font-family:var(--fh);font-size:19px;letter-spacing:2px;color:var(--y);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.st::after{content:'';flex:1;height:1px;background:var(--brd)}
+
+/* ── CARDS ── */
+.card{background:var(--panel);border:1px solid var(--brd);border-radius:4px;padding:16px;margin-bottom:14px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:18px}
+.sc{background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:12px;text-align:center}
+.sc .sv{font-family:var(--fh);font-size:38px;color:var(--y);line-height:1;display:block}
+.sc .sl{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+
+/* ── TABLES ── */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse}
+th{background:#000;color:var(--mut);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;text-align:left;padding:9px 12px;border-bottom:1px solid var(--brd);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--brd);font-size:15px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--p2);transition:background .12s}
+.rk{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-family:var(--fh);font-size:15px;background:var(--brd);color:var(--mut)}
+.rk.r1{background:var(--y);color:#000}.rk.r2{background:#bbb;color:#000}.rk.r3{background:#b5651d;color:#fff}
+.wb{display:inline-flex;align-items:center;gap:3px;background:rgba(255,209,0,.1);border:1px solid rgba(255,209,0,.2);border-radius:3px;padding:2px 7px;font-size:12px;color:var(--y);font-weight:700}
+
+/* ── FORMS ── */
+.fr{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+label{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:1px}
+input,select{background:#000;border:1px solid var(--brd);border-radius:3px;color:var(--txt);font-family:var(--fb);font-size:16px;padding:9px 11px;outline:none;transition:border-color .2s;width:100%;-webkit-appearance:none}
+input:focus,select:focus{border-color:var(--y)}
+select option{background:#1c1c1c}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;background:var(--y);color:#000;border:none;border-radius:3px;font-family:var(--fb);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 16px;cursor:pointer;transition:opacity .15s,transform .1s;white-space:nowrap;min-height:40px;-webkit-tap-highlight-color:transparent}
+.btn:hover{opacity:.84}.btn:active{transform:scale(.97)}
+.btn.red{background:var(--red);color:#fff}
+.btn.ghost{background:transparent;border:1px solid var(--brd);color:var(--mut)}
+.btn.ghost:hover{border-color:var(--txt);color:var(--txt)}
+.btn.sm{padding:5px 10px;font-size:11px;min-height:32px}
+.btn.grn{background:var(--grn);color:#000}
+
+/* ── CAR NUMBER BADGES ── */
+.nbadge{display:inline-flex;align-items:center;justify-content:center;font-family:var(--fh);font-style:italic;font-size:14px;line-height:1;min-width:28px;height:22px;padding:0 5px;border-radius:2px;margin-right:5px;flex-shrink:0;letter-spacing:.5px}
+.nbadge.hendrick{font-size:15px;font-weight:900}
+.nbadge.jgr{letter-spacing:.8px}
+.nbadge.penske{border-width:1px;border-style:solid}
+.nbadge.frm{border-radius:0 3px 3px 0;border-left:3px solid rgba(255,255,255,.4)}
+.nbadge.xxiii{letter-spacing:1px}
+.drow{display:inline-flex;align-items:center;white-space:nowrap}
+.dname{white-space:nowrap}
+
+/* ── RACE ITEMS ── */
+.ri{background:var(--panel);border:1px solid var(--brd);border-radius:4px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.ri-info{flex:1;min-width:180px}
+.rn{font-family:var(--fh);font-size:17px;letter-spacing:1px}
+.rm{color:var(--mut);font-size:12px;margin-top:2px}
+.tag{display:inline-block;padding:2px 7px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.tag.open{background:rgba(0,230,118,.1);color:var(--grn);border:1px solid rgba(0,230,118,.2)}
+.tag.fin{background:rgba(232,0,28,.1);color:var(--red);border:1px solid rgba(232,0,28,.2)}
+.wl{background:rgba(255,209,0,.1);color:var(--y);border:1px solid rgba(255,209,0,.2);font-size:11px;padding:2px 7px;border-radius:2px;font-weight:700}
+.ri-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+
+/* Results */
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin:10px 0}
+.ps{background:#000;border:1px solid var(--brd);border-radius:3px;padding:6px 8px;display:flex;align-items:center;gap:6px}
+.pn{font-family:var(--fh);font-size:18px;color:var(--mut);width:22px;flex-shrink:0}
+.ps select{flex:1;background:transparent;border:none;padding:0;font-size:13px}
+
+/* ── DRAFT BOARD ── */
+.draft-layout{display:grid;grid-template-columns:1fr 270px;gap:14px;align-items:start}
+.draft-pool{background:var(--panel);border:1px solid var(--brd);border-radius:4px;padding:13px;position:sticky;top:60px}
+.dp-title{font-family:var(--fh);font-size:15px;letter-spacing:1px;color:var(--y);margin-bottom:8px}
+.dcard{display:flex;align-items:center;background:var(--p2);border:1px solid var(--brd);border-radius:3px;padding:7px 10px;margin-bottom:4px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;user-select:none;min-height:40px;-webkit-tap-highlight-color:transparent}
+.dcard:hover{border-color:var(--mut);background:#222}
+.dcard.taken{opacity:.4;cursor:default;pointer-events:none}
+.dcard .taken-lbl{position:absolute;right:8px;font-size:10px;color:var(--mut);font-style:italic}
+.dcard .dn{font-size:13px;font-weight:600;flex:1}
+.pick-card{background:var(--panel);border:1px solid var(--brd);border-radius:4px;padding:13px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pick-card.active-part{border-color:var(--y);background:#161400}
+.pick-card-head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.pick-card-name{font-size:15px;font-weight:700;flex:1}
+.pick-drivers{display:flex;flex-wrap:wrap;gap:5px;min-height:30px}
+.pd-tag{display:inline-flex;align-items:center;gap:4px;background:var(--p2);border:1px solid var(--brd);border-radius:3px;padding:4px 8px;font-size:12px;cursor:pointer;min-height:32px;-webkit-tap-highlight-color:transparent}
+.pd-tag:hover{border-color:var(--red)}
+.pd-tag .x{color:var(--mut);font-size:11px}
+.pick-hint{font-size:11px;color:var(--mut);font-style:italic}
+.draft-tip{background:rgba(255,209,0,.06);border:1px solid rgba(255,209,0,.15);border-radius:3px;padding:9px 12px;font-size:12px;color:var(--y);margin-bottom:12px;line-height:1.6}
+
+/* ── HISTORY ── */
+.season-grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:20px}
+.season-grid{border-collapse:collapse;font-size:12px;white-space:nowrap}
+.season-grid th{background:#000;color:var(--mut);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 10px;border:1px solid var(--brd)}
+.season-grid td{padding:7px 10px;border:1px solid var(--brd);vertical-align:middle}
+.season-grid .race-cell{background:#0a0a0a;font-weight:700;font-size:13px;min-width:130px}
+.season-grid .race-date{display:block;font-size:10px;color:var(--mut);font-weight:400;margin-top:1px}
+.sgc-win{background:rgba(255,209,0,.12)!important;color:var(--y);font-weight:700}
+.sgc-lose{color:var(--mut)}
+.sgc-empty{color:#333}
+.part-pick-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--brd)}
+.part-pick-row:last-child{border-bottom:none}
+.ppr-name{font-size:14px;font-weight:700;min-width:90px;flex-shrink:0}
+.ppr-picks{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+
+/* ── AVATAR + PARTICIPANT ── */
+.av{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;font-family:var(--fh);font-size:15px;flex-shrink:0}
+.pc{background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:12px 14px;display:flex;align-items:center;gap:9px}
+
+/* ── DRIVER ROSTER ── */
+.drv-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--brd);transition:background .12s;min-height:48px}
+.drv-row:last-child{border-bottom:none}
+.drv-row:hover{background:var(--p2)}
+.drv-row .dn{flex:1;font-size:14px;font-weight:600}
+.drv-row-actions{display:flex;gap:5px;flex-shrink:0}
+
+/* ── LIVE RACE ── */
+#lrw{background:var(--panel);border:1px solid var(--brd);border-radius:5px;overflow:hidden;margin-bottom:14px}
+.rhb{background:#000;border-bottom:2px solid var(--brd);padding:11px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rhn{font-family:var(--fh);font-size:21px;letter-spacing:2px;color:var(--y)}
+.laps{font-family:var(--fh);font-size:14px;letter-spacing:1px}
+.laps em{color:var(--mut);font-style:normal}
+.flb{font-family:var(--fh);font-size:11px;letter-spacing:1px;padding:3px 8px;border-radius:2px}
+.flg{background:rgba(0,230,118,.1);color:var(--grn);border:1px solid rgba(0,230,118,.2)}
+.fly{background:rgba(255,209,0,.1);color:var(--y);border:1px solid rgba(255,209,0,.2)}
+.flr{background:rgba(232,0,28,.1);color:var(--red);border:1px solid rgba(232,0,28,.2)}
+.flc{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.15)}
+.rts{margin-left:auto;font-size:10px;color:var(--mut)}
+.tarea{padding:12px 16px}
+.tbg{background:#0e0e0e;border:1px solid var(--brd);border-radius:4px;overflow:hidden;position:relative}
+.tbg::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 44px,rgba(255,255,255,.02) 44px,rgba(255,255,255,.02) 45px);pointer-events:none}
+.fline{position:absolute;right:5%;top:0;bottom:0;width:2px;background:repeating-linear-gradient(180deg,#fff 0,#fff 5px,#000 5px,#000 10px);opacity:.25;pointer-events:none}
+.lane{display:grid;grid-template-columns:150px 1fr 58px;align-items:center;min-height:52px;border-bottom:1px solid #1a1a1a;padding:0 10px;transition:background .4s}
+.lane:last-child{border-bottom:none}
+.lane.ld{background:rgba(255,209,0,.03)}
+.li{display:flex;align-items:center;gap:5px;z-index:2}
+.ln{font-size:13px;font-weight:700;white-space:nowrap}
+.ld2{font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.ltrack{position:relative;height:52px;display:flex;align-items:center;overflow:hidden}
+.tline{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.06);top:50%}
+.cm{position:absolute;top:50%;transform:translateY(-55%);transition:left 1.4s cubic-bezier(.34,1.3,.64,1);display:flex;flex-direction:column;align-items:center;gap:2px;z-index:10}
+.ci{font-size:16px;display:block;line-height:1;filter:drop-shadow(0 0 4px currentColor)}
+.ci.mv{animation:bc .5s ease infinite alternate}
+@keyframes bc{from{transform:translateY(0)}to{transform:translateY(-2px)}}
+.cpb{font-family:var(--fh);font-size:10px;background:#000;border:1px solid currentColor;border-radius:2px;padding:0 3px;letter-spacing:.5px}
+.ls{text-align:right;z-index:2}
+.lpos{font-family:var(--fh);font-size:20px;line-height:1}
+.lgap{font-size:10px;color:var(--mut);margin-top:1px}
+.sbar{display:flex;border-top:1px solid var(--brd)}
+.sb2{flex:1;padding:8px 10px;text-align:center;border-right:1px solid var(--brd)}
+.sb2:last-child{border-right:none}
+.sb2 .sv{font-family:var(--fh);font-size:16px;color:var(--y);display:block}
+.sb2 .sl{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-top:1px}
+.dbanner{background:rgba(41,121,255,.07);border:1px solid rgba(41,121,255,.18);margin:10px 16px;border-radius:3px;padding:8px 12px;color:#7ca9ff;font-size:11px}
+.nrbox{padding:30px;text-align:center}
+.nrbox .bi{font-size:44px;display:block;margin-bottom:8px}
+.nrbox h3{font-family:var(--fh);font-size:20px;letter-spacing:2px;color:var(--y);margin-bottom:5px}
+.nrbox p{color:var(--mut);font-size:12px;max-width:280px;margin:0 auto 12px}
+
+/* ── DRIVER FORM PREVIEW ── */
+#drv-preview{display:flex;align-items:center;gap:8px}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:32px 16px;color:var(--mut);font-size:14px}
+.empty .ic{font-size:38px;margin-bottom:7px;display:block}
+
+/* ── CONFETTI ── */
+.cw{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999;overflow:hidden}
+.cp{position:absolute;top:-12px;animation:fall linear forwards}
+@keyframes fall{to{top:110%;transform:rotate(720deg) translateX(var(--dx))}}
+
+/* ════════════════════════
+   MOBILE BREAKPOINTS
+════════════════════════ */
+@media(max-width:640px){
+  /* show bottom nav, hide desktop nav */
+  #mob-nav{display:flex}
+  #desk-nav{display:none}
+  main{padding:14px 12px;padding-bottom:calc(var(--mob-nav-h) + env(safe-area-inset-bottom) + 10px)}
+
+  /* draft: stack single column */
+  .draft-layout{grid-template-columns:1fr}
+  .draft-pool{position:static;margin-top:14px}
+
+  /* race items: stack */
+  .ri{flex-direction:column;gap:8px}
+  .ri-actions{flex-direction:row}
+
+  /* results grid: 2 col */
+  .rgrid{grid-template-columns:1fr 1fr}
+
+  /* stat grid: 2 col */
+  .cgrid{grid-template-columns:1fr 1fr}
+
+  /* history pick rows: stack */
+  .part-pick-row{flex-direction:column;align-items:flex-start}
+
+  /* live race: narrower columns */
+  .lane{grid-template-columns:100px 1fr 44px}
+  .ln{font-size:12px}
+  .lpos{font-size:18px}
+
+  /* leaderboard: hide entered col */
+  .lb-hide-mob{display:none}
+
+  /* season grid: always scroll */
+  .season-grid-wrap{margin:0 -12px;padding:0 12px}
+}
+@media(max-width:400px){
+  .lane{grid-template-columns:80px 1fr 36px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOP LOADING BAR ══ -->
+<div id="top-bar"></div>
+<div id="toast"></div>
+
+<!-- ══ SETUP SCREEN ══ -->
+<div id="setup-screen">
+  <div class="setup-inner">
+    <div class="setup-logo">
+      <div class="setup-chk"></div>
+      <h1>NASCAR <span>Pick'em Pool</span></h1>
+    </div>
+    <p style="color:var(--mut);font-size:14px;margin-bottom:20px;line-height:1.7">
+      This app syncs in real-time using <strong style="color:var(--txt)">Supabase</strong> — a free database so all your friends share the same data. Follow the 3 steps below, then you're done forever.
+    </p>
+
+    <div class="setup-step">
+      <div class="setup-step-title"><span class="setup-step-num">1</span>Create a free Supabase project</div>
+      <p>Go to <a href="https://supabase.com" target="_blank">supabase.com</a> → click <strong style="color:var(--txt)">Start your project</strong> → sign up and create a new project. Note your project's <strong style="color:var(--txt)">Region</strong> and choose any password. It takes about 30 seconds to provision.</p>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-title"><span class="setup-step-num">2</span>Run this SQL in your project</div>
+      <p>In your Supabase dashboard, go to <strong style="color:var(--txt)">SQL Editor</strong> (left sidebar) and paste &amp; run the following:</p>
+      <div class="sql-block" id="sql-block">create table participants (id text primary key, name text not null);
+create table races (id text primary key, name text not null, track text default '', race_date text default '', results jsonb default '[]'::jsonb);
+create table picks (id text primary key, pid text, rid text, drivers jsonb default '[]'::jsonb);
+create table custom_drivers (name text primary key, num text, bg text default '#333333', fg text default '#ffffff', removed boolean default false);
+alter table participants disable row level security;
+alter table races disable row level security;
+alter table picks disable row level security;
+alter table custom_drivers disable row level security;</div>
+      <button class="btn ghost sm copy-sql" onclick="copySQL()" style="margin-top:8px">📋 Copy SQL</button>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-title"><span class="setup-step-num">3</span>Paste your project credentials</div>
+      <p>In Supabase, go to <strong style="color:var(--txt)">Project Settings → API</strong>. Copy the <strong style="color:var(--txt)">Project URL</strong> and the <strong style="color:var(--txt)">anon public</strong> key.</p>
+      <div class="setup-fields">
+        <div class="setup-field"><label>Project URL</label><input id="cfg-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off" autocorrect="off" autocapitalize="off"/></div>
+        <div class="setup-field"><label>Anon Public Key</label><input id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off" autocorrect="off" autocapitalize="off"/></div>
+      </div>
+      <div id="setup-err"></div>
+      <button class="btn setup-connect-btn" onclick="connectSupabase()">🔗 Connect &amp; Launch App</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="chk"></div>
+  <h1>NASCAR <span>Pick'em Pool</span></h1>
+  <div id="lpill"><div class="ldot"></div>LIVE</div>
+  <button id="sync-btn" onclick="manualSync()" title="Sync data">↻</button>
+  <button id="settings-btn" onclick="openMore('settings')" title="Settings">⚙️</button>
+</header>
+
+<!-- ══ DESKTOP NAV ══ -->
+<nav id="desk-nav">
+  <button class="on" onclick="go('standings')">🏆 Standings</button>
+  <button onclick="go('live')">🔴 Live Race</button>
+  <button onclick="go('races')">🏁 Races</button>
+  <button onclick="go('picks')">🎯 Draft Picks</button>
+  <button onclick="go('history')">📊 History</button>
+  <button onclick="go('drivers')">🚗 Drivers</button>
+  <button onclick="go('participants')">👥 Participants</button>
+</nav>
+
+<main>
+
+<!-- STANDINGS -->
+<div id="tab-standings" class="tp on">
+  <div id="sgrid" class="cgrid"></div>
+  <div class="st">Leaderboard</div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table><thead><tr>
+        <th width="42">Pos</th><th>Participant</th><th>Race Wins</th>
+        <th class="lb-hide-mob">Entered</th><th class="lb-hide-mob">Win %</th>
+      </tr></thead><tbody id="lbb"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- LIVE RACE -->
+<div id="tab-live" class="tp">
+  <div class="st">Live Race Tracker</div>
+  <div class="card" id="cfg-card">
+    <div style="font-size:13px;color:var(--mut);margin-bottom:12px;line-height:1.7">Connect to NASCAR's public live timing feed or use <strong style="color:var(--txt)">Demo Mode</strong> to preview the tracker with your current picks.</div>
+    <div class="fr">
+      <div class="fg"><label>NASCAR Race ID</label><input id="nrid" placeholder="e.g. 5741" inputmode="numeric"/></div>
+      <div class="fg" style="max-width:180px"><label>Series</label>
+        <select id="nseries"><option value="1">Cup Series</option><option value="2">Xfinity</option><option value="3">Truck</option></select>
+      </div>
+      <div class="fg"><label>Link Pick'em Race</label>
+        <select id="lrs"><option value="">— Link a Race —</option></select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="goLive()">📡 Connect Feed</button>
+      <button class="btn ghost" onclick="goDemo()">🎮 Demo Mode</button>
+      <button class="btn ghost red" id="stopbtn" style="display:none" onclick="stopFeed()">⏹ Stop</button>
+    </div>
+  </div>
+  <div id="lrw" style="display:none">
+    <div class="rhb">
+      <div class="rhn" id="lrname">—</div>
+      <div class="laps">Lap <span id="lcl">—</span> <em>/</em> <span id="ltl">—</span></div>
+      <div class="flb flg" id="flg">🟢 GREEN</div>
+      <div class="rts" id="rts">—</div>
+    </div>
+    <div class="tarea"><div class="tbg" id="tbg"><div class="fline"></div></div></div>
+    <div class="sbar">
+      <div class="sb2"><span class="sv" id="sb1">—</span><div class="sl">Leader</div></div>
+      <div class="sb2"><span class="sv" id="sb2v">—</span><div class="sl">MPH</div></div>
+      <div class="sb2"><span class="sv" id="sb3">—</span><div class="sl">Running</div></div>
+      <div class="sb2"><span class="sv" id="sb4">—</span><div class="sl">Done</div></div>
+    </div>
+    <div id="dbnr" class="dbanner" style="display:none">🎮 <strong>Demo Mode</strong> — Simulated positions. Connect a live feed for real-time data.</div>
+  </div>
+</div>
+
+<!-- RACES -->
+<div id="tab-races" class="tp">
+  <div class="st">Add Race</div>
+  <div class="card">
+    <div class="fr">
+      <div class="fg"><label>Race Name</label><input id="rname" placeholder="Daytona 500"/></div>
+      <div class="fg"><label>Track</label><input id="rtrack" placeholder="Daytona International Speedway"/></div>
+      <div class="fg" style="max-width:155px"><label>Date</label><input id="rdate" type="date"/></div>
+    </div>
+    <button class="btn" onclick="addRace()">＋ Add Race</button>
+  </div>
+  <div class="st">Schedule</div>
+  <div id="rlist"></div>
+</div>
+
+<!-- PICKS / DRAFT BOARD -->
+<div id="tab-picks" class="tp">
+  <div class="st">Draft Picks</div>
+  <div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div class="fr" style="margin-bottom:0;align-items:flex-end">
+      <div class="fg"><label>Race</label><select id="draft-race" onchange="renderDraft()"><option value="">— Select Race —</option></select></div>
+      <button class="btn ghost sm" style="height:38px" onclick="clearAllPicks()">Clear Picks</button>
+    </div>
+  </div>
+  <div class="draft-tip" id="draft-tip">👆 Select a race, tap a participant card to activate them, then tap drivers to assign.</div>
+  <div class="draft-layout">
+    <div id="draft-parts-col"><div class="empty"><span class="ic">🏁</span>Select a race to start</div></div>
+    <div>
+      <div class="draft-pool" id="draft-pool" style="display:none">
+        <div class="dp-title">Driver Pool</div>
+        <div style="font-size:11px;color:var(--mut);margin-bottom:8px">Greyed = already assigned</div>
+        <input id="pool-search" placeholder="🔍 Filter drivers…" style="margin-bottom:8px;font-size:14px;padding:6px 10px" oninput="filterPool()"/>
+        <div id="pool-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SEASON HISTORY -->
+<div id="tab-history" class="tp">
+  <div class="st">Import Past Race</div>
+  <div class="card">
+    <div style="font-size:13px;color:var(--mut);margin-bottom:12px;line-height:1.6">Enter a completed race — name, winner, and each participant's pick — then import it fully scored.</div>
+    <div class="fr">
+      <div class="fg"><label>Race Name</label><input id="h-rname" placeholder="Daytona 500"/></div>
+      <div class="fg"><label>Track</label><input id="h-track" placeholder="Daytona International Speedway"/></div>
+      <div class="fg" style="max-width:155px"><label>Date</label><input id="h-date" type="date"/></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>Race Winner (P1)</label>
+        <select id="h-winner"><option value="">— Select Winner —</option></select>
+      </div>
+    </div>
+    <div class="st" style="font-size:16px;margin-bottom:8px;margin-top:4px">Participant Picks</div>
+    <div id="h-pick-rows"></div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn grn" onclick="importPastRace()">✓ Import Race</button>
+      <button class="btn ghost" onclick="clearHistForm()">Clear</button>
+    </div>
+  </div>
+  <div class="st">Season Grid</div>
+  <div id="season-grid-area"><div class="empty"><span class="ic">📊</span>Complete some races to see the grid</div></div>
+</div>
+
+<!-- DRIVERS -->
+<div id="tab-drivers" class="tp">
+  <div class="st">Add / Edit Driver</div>
+  <div class="card" id="driver-form-card">
+    <div style="font-size:13px;color:var(--mut);margin-bottom:12px;line-height:1.6">Add new drivers, update car numbers mid-season, or remove drivers who are no longer running.</div>
+    <input type="hidden" id="edit-driver-key" value="">
+    <div class="fr">
+      <div class="fg" style="max-width:250px"><label>Driver Name</label><input id="drv-name" placeholder="First Last" oninput="updateDriverPreview()"/></div>
+      <div class="fg" style="max-width:80px"><label>Car #</label><input id="drv-num" placeholder="5" oninput="updateDriverPreview()" inputmode="text"/></div>
+      <div class="fg" style="max-width:115px"><label>Badge BG</label><input id="drv-bg" type="color" value="#c8001d" style="padding:4px;height:40px;cursor:pointer" oninput="updateDriverPreview()"/></div>
+      <div class="fg" style="max-width:115px"><label>Badge Text</label><input id="drv-fg" type="color" value="#ffffff" style="padding:4px;height:40px;cursor:pointer" oninput="updateDriverPreview()"/></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn" id="drv-save-btn" onclick="saveDriver()">＋ Add Driver</button>
+      <button class="btn ghost" id="drv-cancel-btn" style="display:none" onclick="cancelEditDriver()">Cancel</button>
+      <div id="drv-preview" style="margin-left:8px">
+        <span style="font-size:11px;color:var(--mut)">Preview: </span>
+        <span class="nbadge misc" id="drv-preview-badge" style="background:#c8001d;color:#fff">5</span>
+        <span id="drv-preview-name" style="font-size:13px;color:var(--mut)">Driver Name</span>
+      </div>
+    </div>
+  </div>
+  <div class="st">Driver Roster <span id="drv-count-lbl" style="font-family:var(--fb);font-size:12px;color:var(--mut);letter-spacing:0;font-weight:400"></span></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--brd);align-items:center;flex-wrap:wrap">
+      <input id="drv-search" placeholder="🔍  Search…" style="max-width:240px;padding:7px 10px;font-size:14px" oninput="renderDriverRoster()"/>
+      <button class="btn ghost sm" onclick="resetDriversToDefault()" style="margin-left:auto">↺ Reset Roster</button>
+    </div>
+    <div id="drv-roster-body"></div>
+  </div>
+</div>
+
+<!-- PARTICIPANTS -->
+<div id="tab-participants" class="tp">
+  <div class="st">Add Participant</div>
+  <div class="card">
+    <div class="fr"><div class="fg"><label>Name</label><input id="pnm" placeholder="Your name"/></div></div>
+    <button class="btn" onclick="addParticipant()">＋ Add Participant</button>
+  </div>
+  <div class="st">Scoring Rules</div>
+  <div class="card" style="line-height:1.8;color:var(--mut);font-size:14px">
+    🏆 <strong style="color:var(--txt)">Winner-Take-All per race.</strong> If any of your assigned drivers wins the race, you earn a <strong style="color:var(--y)">pool win</strong>. The season champion has the most race wins.
+  </div>
+  <div class="st">Pool Members</div>
+  <div id="plist" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px"></div>
+</div>
+
+</main>
+
+<!-- ══ MOBILE BOTTOM NAV ══ -->
+<nav id="mob-nav">
+  <button id="mnav-standings" onclick="go('standings')"><span class="mico">🏆</span><span>Standings</span></button>
+  <button id="mnav-races" onclick="go('races')"><span class="mico">🏁</span><span>Races</span></button>
+  <button id="mnav-picks" onclick="go('picks')"><span class="mico">🎯</span><span>Picks</span></button>
+  <button id="mnav-live" onclick="go('live')"><span class="mico">🔴</span><span>Live</span></button>
+  <button id="mnav-more" onclick="openMore()"><span class="mico">☰</span><span>More</span></button>
+</nav>
+
+<!-- ══ MORE SHEET ══ -->
+<div id="more-sheet">
+  <div class="ms-backdrop" onclick="closeMore()"></div>
+  <div class="ms-panel">
+    <div class="ms-handle"></div>
+    <button class="ms-btn" onclick="go('history');closeMore()"><span class="mico">📊</span>Season History</button>
+    <button class="ms-btn" onclick="go('drivers');closeMore()"><span class="mico">🚗</span>Manage Drivers</button>
+    <button class="ms-btn" onclick="go('participants');closeMore()"><span class="mico">👥</span>Participants</button>
+    <div id="settings-section" style="display:none">
+      <div class="ms-sep"></div>
+      <button class="ms-btn danger" onclick="disconnectDB();closeMore()"><span class="mico">⚙️</span>Change Database</button>
+    </div>
+    <div class="ms-sep"></div>
+    <button class="ms-btn" onclick="manualSync();closeMore()"><span class="mico">↻</span>Sync Now</button>
+  </div>
+</div>
+
+<div class="cw" id="cw"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// DEFAULT CAR DATA  (2025 Cup Series)
+// ══════════════════════════════════════════════════════════════
+const DEFAULT_CARS={
+  "Ross Chastain":       {n:"1",  bg:"#006341",fg:"#fff", cls:"tkhs"},
+  "Austin Cindric":      {n:"2",  bg:"#003087",fg:"#fff", cls:"penske"},
+  "Austin Dillon":       {n:"3",  bg:"#0d2f6e",fg:"#fff", cls:"rcr"},
+  "Josh Berry":          {n:"4",  bg:"#8b0000",fg:"#fff", cls:"misc"},
+  "Kyle Larson":         {n:"5",  bg:"#c8001d",fg:"#fff", cls:"hendrick"},
+  "Brad Keselowski":     {n:"6",  bg:"#003087",fg:"#fff", cls:"rkn"},
+  "Corey LaJoie":        {n:"7",  bg:"#3a3a3a",fg:"#aaa", cls:"misc"},
+  "Kyle Busch":          {n:"8",  bg:"#111",   fg:"#e22020",cls:"rcr"},
+  "Chase Elliott":       {n:"9",  bg:"#c8001d",fg:"#fff", cls:"hendrick"},
+  "Noah Gragson":        {n:"10", bg:"#0057a8",fg:"#fff", cls:"misc"},
+  "Denny Hamlin":        {n:"11", bg:"#4a0072",fg:"#fff", cls:"jgr"},
+  "Ryan Blaney":         {n:"12", bg:"#003087",fg:"#fff", cls:"penske"},
+  "Chris Buescher":      {n:"17", bg:"#003087",fg:"#ffd100",cls:"rkn"},
+  "Martin Truex Jr.":    {n:"19", bg:"#c8001d",fg:"#fff", cls:"jgr"},
+  "Christopher Bell":    {n:"20", bg:"#c8001d",fg:"#fff", cls:"jgr"},
+  "Harrison Burton":     {n:"21", bg:"#722f37",fg:"#fff", cls:"misc"},
+  "Joey Logano":         {n:"22", bg:"#ffd100",fg:"#000", cls:"penske"},
+  "Bubba Wallace":       {n:"23", bg:"#111",   fg:"#e22020",cls:"xxiii"},
+  "William Byron":       {n:"24", bg:"#1040cc",fg:"#fff", cls:"hendrick"},
+  "Michael McDowell":    {n:"34", bg:"#e05500",fg:"#fff", cls:"frm"},
+  "Todd Gilliland":      {n:"38", bg:"#e05500",fg:"#fff", cls:"frm"},
+  "Cole Custer":         {n:"41", bg:"#c8001d",fg:"#fff", cls:"misc"},
+  "Erik Jones":          {n:"43", bg:"#6a1b9a",fg:"#fff", cls:"misc"},
+  "Tyler Reddick":       {n:"45", bg:"#111",   fg:"#e22020",cls:"xxiii"},
+  "Ricky Stenhouse Jr.": {n:"47", bg:"#b71c1c",fg:"#fff", cls:"misc"},
+  "Alex Bowman":         {n:"48", bg:"#512da8",fg:"#fff", cls:"hendrick"},
+  "Justin Haley":        {n:"51", bg:"#3a3a3a",fg:"#aaa", cls:"misc"},
+  "Ty Gibbs":            {n:"54", bg:"#c8001d",fg:"#fff", cls:"jgr"},
+  "Zane Smith":          {n:"71", bg:"#3a3a3a",fg:"#aaa", cls:"misc"},
+  "Daniel Suarez":       {n:"99", bg:"#e4002b",fg:"#fff", cls:"tkhs"},
+  "Ryan Preece":         {n:"37", bg:"#3a3a3a",fg:"#aaa", cls:"misc"},
+};
+
+// ── DRIVER HELPERS ──
+function getCars(){
+  const merged=Object.assign({},DEFAULT_CARS,S.drivers||{});
+  const out={};
+  for(const[k,v]of Object.entries(merged)){if(!v._removed)out[k]=v;}
+  return out;
+}
+function carData(n){const c=getCars();return c[n]||{n:"—",bg:"#333",fg:"#aaa",cls:"misc"}}
+function getDRV(){return Object.keys(getCars()).sort()}
+function dTag(name,size=14){const c=carData(name);return`<span class="drow"><span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg};font-size:${size}px">${c.n}</span><span class="dname">${name}</span></span>`}
+function numOnly(name){const c=carData(name);return`<span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg}">${c.n}</span>`}
+function drvOption(d){return`<option value="${d}">${carData(d).n} · ${d}</option>`}
+
+// ══════════════════════════════════════════════════════════════
+// CONFIG + SUPABASE
+// ══════════════════════════════════════════════════════════════
+const CFG_KEY='nascar_sb_cfg';
+const AVC=['#e8001c','#ffd100','#0057b8','#00e676','#ff6d00','#ce93d8','#00bcd4','#ff8a80','#a5d6a7','#fff176'];
+
+let db=null;
+
+function getConfig(){try{return JSON.parse(localStorage.getItem(CFG_KEY))||null}catch{return null}}
+function saveConfig(url,key){localStorage.setItem(CFG_KEY,JSON.stringify({url,key}))}
+
+async function connectSupabase(){
+  const url=document.getElementById('cfg-url').value.trim();
+  const key=document.getElementById('cfg-key').value.trim();
+  const errEl=document.getElementById('setup-err');
+  errEl.textContent='';
+  if(!url||!key){errEl.textContent='Both fields are required.';return;}
+  if(!url.startsWith('https://')){errEl.textContent='URL must start with https://';return;}
+  const btn=document.querySelector('.setup-connect-btn');
+  btn.textContent='Connecting…';btn.disabled=true;
+  try{
+    db=window.supabase.createClient(url,key);
+    // Test connection
+    const{error}=await db.from('participants').select('id').limit(1);
+    if(error)throw new Error(error.message);
+    saveConfig(url,key);
+    document.getElementById('setup-screen').classList.add('gone');
+    await loadAll();
+    subscribeRealtime();
+    toast('Connected! 🏁','ok');
+  }catch(e){
+    errEl.textContent='Connection failed: '+e.message+'. Check your URL, key, and that you ran the SQL setup.';
+    btn.textContent='🔗 Connect & Launch App';btn.disabled=false;
+  }
+}
+
+async function initFromConfig(){
+  const cfg=getConfig();
+  if(!cfg)return false;
+  try{
+    db=window.supabase.createClient(cfg.url,cfg.key);
+    document.getElementById('setup-screen').classList.add('gone');
+    return true;
+  }catch{return false}
+}
+
+function disconnectDB(){
+  if(!confirm('Disconnect from current database? Your data stays in Supabase — you can reconnect anytime.'))return;
+  localStorage.removeItem(CFG_KEY);
+  location.reload();
+}
+
+function copySQL(){
+  const sql=document.getElementById('sql-block').textContent;
+  navigator.clipboard.writeText(sql).then(()=>toast('SQL copied!','ok')).catch(()=>toast('Select and copy manually','warn'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATE (in-memory cache of Supabase data)
+// ══════════════════════════════════════════════════════════════
+let S={participants:[],races:[],picks:[],drivers:{}};
+
+async function loadAll(){
+  if(!db)return;
+  startLoad();
+  try{
+    const[{data:parts,error:e1},{data:races,error:e2},{data:picks,error:e3},{data:cdrvs,error:e4}]=
+      await Promise.all([
+        db.from('participants').select('*').order('name'),
+        db.from('races').select('*').order('race_date').order('name'),
+        db.from('picks').select('*'),
+        db.from('custom_drivers').select('*')
+      ]);
+    if(e1||e2||e3||e4)throw new Error((e1||e2||e3||e4).message);
+    S.participants=parts||[];
+    S.races=(races||[]).map(r=>({...r,date:r.race_date,results:r.results||[]}));
+    S.picks=(picks||[]).map(p=>({...p,drivers:p.drivers||[]}));
+    S.drivers={};
+    for(const d of(cdrvs||[])){
+      S.drivers[d.name]=d.removed?{_removed:true}:{n:d.num,bg:d.bg,fg:d.fg,cls:'misc'};
+    }
+    render();
+  }catch(e){
+    toast('Sync error: '+e.message,'err');
+  }finally{endLoad();}
+}
+
+// debounced reload for realtime events
+let reloadTimer=null;
+function scheduleReload(){clearTimeout(reloadTimer);reloadTimer=setTimeout(loadAll,400);}
+
+function subscribeRealtime(){
+  if(!db)return;
+  db.channel('pool-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'participants'},scheduleReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'races'},scheduleReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'picks'},scheduleReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'custom_drivers'},scheduleReload)
+    .subscribe();
+}
+
+async function manualSync(){
+  document.getElementById('sync-btn').classList.add('spin');
+  await loadAll();
+  setTimeout(()=>document.getElementById('sync-btn').classList.remove('spin'),600);
+  toast('Synced ✓','ok');
+}
+
+// ── LOADING UI ──
+function startLoad(){
+  const b=document.getElementById('top-bar');
+  b.classList.remove('done');b.classList.add('show');
+}
+function endLoad(){
+  const b=document.getElementById('top-bar');
+  b.classList.add('done');
+  setTimeout(()=>{b.classList.remove('show','done')},350);
+}
+
+// ── TOAST ──
+let toastT=null;
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// ── UID ──
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+// ══════════════════════════════════════════════════════════════
+// SCORING
+// ══════════════════════════════════════════════════════════════
+function raceWinner(race){return race.results&&race.results[0]||null}
+function pstats(pid){
+  let wins=0,entered=0;
+  for(const r of S.races){
+    const pk=S.picks.find(x=>x.pid===pid&&x.rid===r.id);
+    if(!pk||!pk.drivers||!pk.drivers.length||!r.results||!r.results.length)continue;
+    entered++;
+    if(pk.drivers.includes(raceWinner(r)))wins++;
+  }
+  return{wins,entered};
+}
+function lboard(){
+  return S.participants.map(p=>({...p,...pstats(p.id)}))
+    .sort((a,b)=>b.wins-a.wins||a.name.localeCompare(b.name));
+}
+
+// ══════════════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════════════
+const TAB_ORDER=['standings','live','races','picks','history','drivers','participants'];
+const MOB_TABS=['standings','races','picks','live'];// bottom nav tabs
+
+function go(n){
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('#desk-nav button').forEach(b=>b.classList.remove('on'));
+  MOB_TABS.forEach(t=>{const b=document.getElementById('mnav-'+t);if(b)b.classList.remove('on')});
+  document.getElementById('tab-'+n).classList.add('on');
+  const di=TAB_ORDER.indexOf(n);
+  if(di>=0)document.querySelectorAll('#desk-nav button')[di].classList.add('on');
+  if(MOB_TABS.includes(n)){const mb=document.getElementById('mnav-'+n);if(mb)mb.classList.add('on');}
+  else{document.getElementById('mnav-more').classList.add('on');}
+  render();
+}
+
+function openMore(section){
+  if(section==='settings')document.getElementById('settings-section').style.display='block';
+  document.getElementById('more-sheet').classList.add('open');
+}
+function closeMore(){document.getElementById('more-sheet').classList.remove('open')}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+function render(){
+  renderStandings();renderRaces();renderDraftRaceSelect();renderDraft();
+  renderHistForm();renderSeasonGrid();renderDriverRoster();renderParticipants();renderLRS();
+}
+
+function renderStandings(){
+  const l=lboard();
+  const done=S.races.filter(r=>r.results&&r.results.length).length;
+  document.getElementById('sgrid').innerHTML=`
+    <div class="sc"><span class="sv">${S.participants.length}</span><div class="sl">Participants</div></div>
+    <div class="sc"><span class="sv">${done}</span><div class="sl">Races Final</div></div>
+    <div class="sc"><span class="sv">${S.races.length-done}</span><div class="sl">Upcoming</div></div>
+    <div class="sc"><span class="sv">${l.reduce((s,p)=>s+p.wins,0)}</span><div class="sl">Pool Wins</div></div>`;
+  const tb=document.getElementById('lbb');
+  if(!l.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty"><span class="ic">🏁</span>Add participants to get started</div></td></tr>`;return;}
+  tb.innerHTML=l.map((p,i)=>{
+    const cls=i<3?`r${i+1}`:'';
+    const c=AVC[S.participants.findIndex(x=>x.id===p.id)%AVC.length];
+    const pct=p.entered?Math.round(p.wins/p.entered*100)+'%':'—';
+    return`<tr>
+      <td><span class="rk ${cls}">${i+1}</span></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><span class="av" style="background:${c}22;color:${c};border:1px solid ${c}44">${p.name[0]}</span><span style="font-size:15px;font-weight:700">${p.name}</span></div></td>
+      <td><span class="wb">🏆 ${p.wins} ${p.wins===1?'Win':'Wins'}</span></td>
+      <td class="lb-hide-mob" style="color:var(--mut)">${p.entered}</td>
+      <td class="lb-hide-mob" style="font-family:var(--fh);font-size:18px;color:var(--y)">${pct}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRaces(){
+  const el=document.getElementById('rlist');
+  if(!S.races.length){el.innerHTML=`<div class="empty"><span class="ic">🏎️</span>No races yet</div>`;return;}
+  el.innerHTML=S.races.map(r=>{
+    const w=raceWinner(r);const fin=r.results&&r.results.length;
+    const wp=w?S.picks.find(pk=>pk.drivers&&pk.drivers.includes(w)&&pk.rid===r.id):null;
+    const wpart=wp?S.participants.find(p=>p.id===wp.pid):null;
+    return`<div class="ri">
+      <div class="ri-info">
+        <div class="rn">${r.name}</div>
+        <div class="rm">${r.track||'Track TBD'} &bull; ${r.date||'TBD'}</div>
+        ${fin?`<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="wl">🏁 ${dTag(w,11)}</span>
+          ${wpart?`<span style="font-size:12px;color:var(--grn);font-weight:700">🏆 ${wpart.name} wins!</span>`:`<span style="font-size:12px;color:var(--mut)">No pool winner</span>`}
+        </div>`:''}
+      </div>
+      <span class="tag ${fin?'fin':'open'}">${fin?'Final':'Open'}</span>
+      <div class="ri-actions">
+        <button class="btn sm" onclick="toggleR('${r.id}')">📊 ${fin?'Edit':'Enter'} Results</button>
+        <button class="btn sm ghost red" onclick="delRace('${r.id}')">✕ Delete</button>
+      </div>
+    </div>
+    ${r._show?rPanel(r):''}`;
+  }).join('');
+}
+
+function rPanel(r){
+  const cr=r.results||[];
+  return`<div class="card" style="border-top:none;border-radius:0 0 4px 4px;margin:-4px 0 8px;background:#0f0f0f">
+    <div style="font-family:var(--fh);font-size:16px;color:var(--y);margin-bottom:8px">Top 10 Finishers <span style="font-size:11px;color:var(--mut);font-family:var(--fb)">— P1 determines pool winner</span></div>
+    <div class="rgrid">${[1,2,3,4,5,6,7,8,9,10].map(pos=>`
+      <div class="ps"><span class="pn">${pos}</span>
+        <select id="rs-${r.id}-${pos}"><option value="">—</option>${getDRV().map(d=>`<option value="${d}" ${cr[pos-1]===d?'selected':''}>${carData(d).n} · ${d}</option>`).join('')}</select>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn" onclick="saveRes('${r.id}')">✓ Save Results</button>
+      <button class="btn ghost" onclick="toggleR('${r.id}')">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function renderDraftRaceSelect(){
+  const sel=document.getElementById('draft-race');const cur=sel.value;
+  sel.innerHTML='<option value="">— Select Race —</option>'+S.races.map(r=>`<option value="${r.id}" ${r.id===cur?'selected':''}>${r.name}</option>`).join('');
+}
+
+let selectedPid=null;
+let draftRid=null;
+
+function renderDraft(){
+  const rid=document.getElementById('draft-race').value;
+  draftRid=rid;
+  const partsCol=document.getElementById('draft-parts-col');
+  const pool=document.getElementById('draft-pool');
+  if(!rid){partsCol.innerHTML='<div class="empty"><span class="ic">🏁</span>Select a race to start the draft</div>';pool.style.display='none';return;}
+  if(!S.participants.length){partsCol.innerHTML='<div class="empty"><span class="ic">👥</span>Add participants first</div>';pool.style.display='none';return;}
+  pool.style.display='block';
+  const allPicks=S.picks.filter(x=>x.rid===rid);
+  const assignedMap={};
+  for(const pk of allPicks){const part=S.participants.find(p=>p.id===pk.pid);for(const d of(pk.drivers||[])){assignedMap[d]=part?part.name:'?';}}
+  partsCol.innerHTML=S.participants.map(p=>{
+    const c=AVC[S.participants.indexOf(p)%AVC.length];
+    const pk=S.picks.find(x=>x.pid===p.id&&x.rid===rid);
+    const drivers=(pk&&pk.drivers)||[];
+    const isActive=selectedPid===p.id;
+    return`<div class="pick-card ${isActive?'active-part':''}" onclick="selectPart('${p.id}')">
+      <div class="pick-card-head">
+        <span class="av" style="background:${c}22;color:${c};border:1px solid ${c}44">${p.name[0]}</span>
+        <span class="pick-card-name">${p.name}</span>
+        ${isActive?`<span style="font-size:10px;color:var(--y);font-weight:700">ACTIVE</span>`:''}
+        <span style="font-size:11px;color:var(--mut)">${drivers.length} driver${drivers.length!==1?'s':''}</span>
+      </div>
+      <div class="pick-drivers">
+        ${drivers.length?drivers.map(d=>`<span class="pd-tag" onclick="removeDriverPick(event,'${p.id}','${rid}','${d.replace(/'/g,"\\'")}')">
+          ${dTag(d,11)}<span class="x">✕</span></span>`).join(''):`<span class="pick-hint">Tap to activate, then tap drivers →</span>`}
+      </div>
+    </div>`;
+  }).join('');
+  filterPool();
+}
+
+function filterPool(){
+  const rid=draftRid||document.getElementById('draft-race').value;
+  if(!rid)return;
+  const search=(document.getElementById('pool-search').value||'').toLowerCase();
+  const allPicks=S.picks.filter(x=>x.rid===rid);
+  const assignedMap={};
+  for(const pk of allPicks){const part=S.participants.find(p=>p.id===pk.pid);for(const d of(pk.drivers||[])){assignedMap[d]=part?part.name:'?';}}
+  const drivers=getDRV().filter(d=>!search||d.toLowerCase().includes(search));
+  document.getElementById('pool-list').innerHTML=drivers.map(d=>{
+    const taken=assignedMap[d];const c=carData(d);
+    return`<div class="dcard ${taken?'taken':''}" onclick="assignDriver('${d.replace(/'/g,"\\'")}')">
+      <span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg};margin-right:7px">${c.n}</span>
+      <span class="dn">${d}</span>
+      ${taken?`<span class="taken-lbl">${taken}</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function selectPart(pid){selectedPid=(selectedPid===pid)?null:pid;renderDraft();}
+
+async function assignDriver(driver){
+  if(!selectedPid){toast('Tap a participant card first','warn');return;}
+  const rid=draftRid;
+  const allPicks=S.picks.filter(x=>x.rid===rid);
+  for(const pk of allPicks){
+    if(pk.pid!==selectedPid&&pk.drivers&&pk.drivers.includes(driver)){
+      const part=S.participants.find(x=>x.id===pk.pid);
+      toast(`${driver} is already on ${part?part.name:'someone'}'s team`,'warn');return;
+    }
+  }
+  let pk=S.picks.find(x=>x.pid===selectedPid&&x.rid===rid);
+  if(pk){
+    if(pk.drivers.includes(driver))return;
+    const newDrivers=[...pk.drivers,driver];
+    const{error}=await db.from('picks').update({drivers:newDrivers}).eq('id',pk.id);
+    if(error){toast('Save error: '+error.message,'err');return;}
+  }else{
+    const id=uid();
+    const{error}=await db.from('picks').insert({id,pid:selectedPid,rid,drivers:[driver]});
+    if(error){toast('Save error: '+error.message,'err');return;}
+  }
+  await loadAll();
+  // Re-apply draft race selection after reload
+  document.getElementById('draft-race').value=rid;draftRid=rid;
+  renderDraft();
+}
+
+async function removeDriverPick(e,pid,rid,driver){
+  e.stopPropagation();
+  const pk=S.picks.find(x=>x.pid===pid&&x.rid===rid);
+  if(!pk)return;
+  const newDrivers=pk.drivers.filter(d=>d!==driver);
+  const{error}=await db.from('picks').update({drivers:newDrivers}).eq('id',pk.id);
+  if(error){toast('Error: '+error.message,'err');return;}
+  await loadAll();
+  document.getElementById('draft-race').value=rid;draftRid=rid;
+  renderDraft();
+}
+
+async function clearAllPicks(){
+  const rid=document.getElementById('draft-race').value;
+  if(!rid)return;
+  if(!confirm('Clear all picks for this race?'))return;
+  const ids=S.picks.filter(p=>p.rid===rid).map(p=>p.id);
+  if(ids.length)await db.from('picks').delete().in('id',ids);
+  selectedPid=null;await loadAll();
+  document.getElementById('draft-race').value=rid;draftRid=rid;
+  renderDraft();
+}
+
+function renderHistForm(){
+  const ws=document.getElementById('h-winner');const wv=ws.value;
+  ws.innerHTML='<option value="">— Select Winner —</option>'+getDRV().map(drvOption).join('');
+  ws.value=wv;
+  const el=document.getElementById('h-pick-rows');
+  if(!S.participants.length){el.innerHTML='<div style="color:var(--mut);font-size:13px">Add participants first.</div>';return;}
+  el.innerHTML=S.participants.map(p=>`
+    <div class="part-pick-row">
+      <span class="ppr-name">${p.name}</span>
+      <div class="ppr-picks" id="hpicks-${p.id}">
+        <select class="h-drv-sel" data-pid="${p.id}" style="font-size:16px;padding:7px 10px;background:#000;border:1px solid var(--brd);border-radius:3px;color:var(--txt)">
+          <option value="">— No pick —</option>${getDRV().map(drvOption).join('')}
+        </select>
+      </div>
+      <button class="btn ghost sm" onclick="addHistPickRow('${p.id}')">＋ Pick</button>
+    </div>`).join('');
+}
+
+function addHistPickRow(pid){
+  const c=document.getElementById(`hpicks-${pid}`);
+  const sel=document.createElement('select');
+  sel.className='h-drv-sel';sel.dataset.pid=pid;
+  sel.style.cssText='font-size:16px;padding:7px 10px;background:#000;border:1px solid var(--brd);border-radius:3px;color:var(--txt)';
+  sel.innerHTML='<option value="">— No pick —</option>'+getDRV().map(drvOption).join('');
+  c.appendChild(sel);
+}
+
+async function importPastRace(){
+  const name=document.getElementById('h-rname').value.trim();
+  const track=document.getElementById('h-track').value.trim();
+  const date=document.getElementById('h-date').value;
+  const winner=document.getElementById('h-winner').value;
+  if(!name){toast('Race name required','warn');return;}
+  if(!winner){toast('Select a race winner','warn');return;}
+  startLoad();
+  const rid=uid();
+  const{error:re}=await db.from('races').insert({id:rid,name,track,race_date:date,results:[winner]});
+  if(re){toast('Error: '+re.message,'err');endLoad();return;}
+  // Collect picks grouped by participant
+  const byPid={};
+  document.querySelectorAll('.h-drv-sel').forEach(sel=>{
+    if(!sel.value)return;
+    const pid=sel.dataset.pid;
+    if(!byPid[pid])byPid[pid]=[];
+    if(!byPid[pid].includes(sel.value))byPid[pid].push(sel.value);
+  });
+  for(const[pid,drivers]of Object.entries(byPid)){
+    await db.from('picks').insert({id:uid(),pid,rid,drivers});
+  }
+  endLoad();clearHistForm();await loadAll();
+  toast(`"${name}" imported! 🏁`,'ok');
+}
+
+function clearHistForm(){
+  ['h-rname','h-track','h-date'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('h-winner').value='';
+  renderHistForm();
+}
+
+function renderSeasonGrid(){
+  const el=document.getElementById('season-grid-area');
+  const finRaces=S.races.filter(r=>r.results&&r.results.length);
+  if(!finRaces.length||!S.participants.length){el.innerHTML=`<div class="empty"><span class="ic">📊</span>Complete some races to see the season grid</div>`;return;}
+  el.innerHTML=`<div class="season-grid-wrap"><table class="season-grid">
+    <thead><tr><th>Race</th><th>Winner</th>${S.participants.map(p=>`<th>${p.name}</th>`).join('')}</tr></thead>
+    <tbody>${finRaces.map(r=>{
+      const w=raceWinner(r);
+      return`<tr>
+        <td class="race-cell">${r.name}<span class="race-date">${r.date||'—'}</span></td>
+        <td>${w?dTag(w,11):'—'}</td>
+        ${S.participants.map(p=>{
+          const pk=S.picks.find(x=>x.pid===p.id&&x.rid===r.id);
+          if(!pk||!pk.drivers||!pk.drivers.length)return`<td class="sgc-empty">—</td>`;
+          const won=pk.drivers.includes(w);
+          return`<td class="${won?'sgc-win':'sgc-lose'}">${pk.drivers.map(d=>dTag(d,10)).join('<br>')}${won?'<br><span style="font-size:9px">🏆 WIN</span>':''}`;
+        }).join('')}
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function renderLRS(){
+  const sel=document.getElementById('lrs');const cur=sel.value;
+  sel.innerHTML='<option value="">— Link a Race —</option>'+S.races.map(r=>`<option value="${r.id}" ${r.id===cur?'selected':''}>${r.name}</option>`).join('');
+}
+
+// ── DRIVER MANAGEMENT ──
+function renderDriverRoster(){
+  const search=(document.getElementById('drv-search').value||'').toLowerCase();
+  const all=getCars();const names=Object.keys(all).sort();
+  const filtered=search?names.filter(n=>n.toLowerCase().includes(search)||all[n].n.includes(search)):names;
+  document.getElementById('drv-count-lbl').textContent=`(${names.length} drivers)`;
+  const el=document.getElementById('drv-roster-body');
+  if(!filtered.length){el.innerHTML=`<div class="empty"><span class="ic">🔍</span>No match</div>`;return;}
+  el.innerHTML=filtered.map(name=>{
+    const c=all[name];const isDefault=!!DEFAULT_CARS[name];const isOverride=!!(S.drivers&&S.drivers[name]&&!S.drivers[name]._removed);
+    const badge=isOverride?`<span style="font-size:10px;color:var(--y);border:1px solid rgba(255,209,0,.3);border-radius:2px;padding:1px 5px">edited</span>`:
+      isDefault?`<span style="font-size:10px;color:var(--mut);border:1px solid var(--brd);border-radius:2px;padding:1px 5px;font-style:italic">default</span>`:
+      `<span style="font-size:10px;color:var(--grn);border:1px solid rgba(0,230,118,.3);border-radius:2px;padding:1px 5px">custom</span>`;
+    return`<div class="drv-row">
+      <span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg};font-size:14px;min-width:30px;height:22px">${c.n}</span>
+      <span class="dn">${name}</span>${badge}
+      <div class="drv-row-actions">
+        <button class="btn sm ghost" onclick="editDriver('${name.replace(/'/g,"\\'")}')">✏️</button>
+        <button class="btn sm ghost red" onclick="removeDriver2('${name.replace(/'/g,"\\'")}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateDriverPreview(){
+  const num=document.getElementById('drv-num').value||'?';
+  const bg=document.getElementById('drv-bg').value;
+  const fg=document.getElementById('drv-fg').value;
+  const name=document.getElementById('drv-name').value||'Driver Name';
+  const b=document.getElementById('drv-preview-badge');
+  b.textContent=num;b.style.background=bg;b.style.color=fg;
+  document.getElementById('drv-preview-name').textContent=name;
+}
+
+async function saveDriver(){
+  const name=document.getElementById('drv-name').value.trim();
+  const num=document.getElementById('drv-num').value.trim();
+  const bg=document.getElementById('drv-bg').value;
+  const fg=document.getElementById('drv-fg').value;
+  const editKey=document.getElementById('edit-driver-key').value;
+  if(!name||!num){toast('Name and car number required','warn');return;}
+  startLoad();
+  if(editKey&&editKey!==name){
+    // Delete old entry
+    await db.from('custom_drivers').delete().eq('name',editKey);
+    if(DEFAULT_CARS[editKey])await db.from('custom_drivers').upsert({name:editKey,num:'—',bg:'#333',fg:'#aaa',removed:true});
+  }
+  const{error}=await db.from('custom_drivers').upsert({name,num,bg,fg,removed:false});
+  endLoad();
+  if(error){toast('Error: '+error.message,'err');return;}
+  cancelEditDriver();await loadAll();
+  toast(`${name} saved ✓`,'ok');
+}
+
+function editDriver(name){
+  const c=carData(name);
+  document.getElementById('drv-name').value=name;
+  document.getElementById('drv-num').value=c.n;
+  document.getElementById('drv-bg').value=c.bg.length===7?c.bg:'#333333';
+  document.getElementById('drv-fg').value=c.fg.length===7?c.fg:'#ffffff';
+  document.getElementById('edit-driver-key').value=name;
+  document.getElementById('drv-save-btn').textContent='✓ Save Changes';
+  document.getElementById('drv-cancel-btn').style.display='';
+  updateDriverPreview();
+  document.getElementById('driver-form-card').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function cancelEditDriver(){
+  ['drv-name','drv-num','edit-driver-key'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('drv-bg').value='#c8001d';
+  document.getElementById('drv-fg').value='#ffffff';
+  document.getElementById('drv-save-btn').textContent='＋ Add Driver';
+  document.getElementById('drv-cancel-btn').style.display='none';
+  updateDriverPreview();
+}
+
+async function removeDriver2(name){
+  if(!confirm(`Remove ${name} from the driver pool?`))return;
+  startLoad();
+  if(DEFAULT_CARS[name]){
+    const{error}=await db.from('custom_drivers').upsert({name,num:'—',bg:'#333',fg:'#aaa',removed:true});
+    if(error){toast('Error: '+error.message,'err');endLoad();return;}
+  }else{
+    await db.from('custom_drivers').delete().eq('name',name);
+  }
+  endLoad();await loadAll();toast(`${name} removed`,'ok');
+}
+
+async function resetDriversToDefault(){
+  if(!confirm('Reset to the built-in 2025 Cup Series roster? All custom edits will be cleared.'))return;
+  startLoad();
+  await db.from('custom_drivers').delete().neq('name','__none__');
+  endLoad();await loadAll();toast('Roster reset ✓','ok');
+}
+
+function renderParticipants(){
+  const el=document.getElementById('plist');
+  if(!S.participants.length){el.innerHTML=`<div class="empty" style="grid-column:1/-1"><span class="ic">👥</span>No participants yet</div>`;return;}
+  const l=lboard();
+  el.innerHTML=S.participants.map((p,i)=>{
+    const c=AVC[i%AVC.length];const s=l.find(x=>x.id===p.id)||{wins:0,entered:0};
+    return`<div class="pc">
+      <span class="av" style="background:${c}22;color:${c};border:1px solid ${c}44">${p.name[0]}</span>
+      <div><div style="font-size:15px;font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--mut)">${s.entered} entered</div></div>
+      <div style="margin-left:auto;font-family:var(--fh);font-size:18px;color:var(--y)">${s.wins}W</div>
+      <button class="btn sm ghost red" onclick="delPart('${p.id}')" style="margin-left:4px">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// ACTIONS (all async — write to Supabase, then loadAll)
+// ══════════════════════════════════════════════════════════════
+async function addRace(){
+  const name=document.getElementById('rname').value.trim();
+  if(!name){toast('Race name required','warn');return;}
+  const track=document.getElementById('rtrack').value.trim();
+  const race_date=document.getElementById('rdate').value;
+  startLoad();
+  const{error}=await db.from('races').insert({id:uid(),name,track,race_date,results:[]});
+  endLoad();
+  if(error){toast('Error: '+error.message,'err');return;}
+  ['rname','rtrack','rdate'].forEach(id=>document.getElementById(id).value='');
+  await loadAll();toast(`"${name}" added ✓`,'ok');
+}
+
+async function delRace(id){
+  if(!confirm('Delete this race and all its picks?'))return;
+  startLoad();
+  const pickIds=S.picks.filter(p=>p.rid===id).map(p=>p.id);
+  if(pickIds.length)await db.from('picks').delete().in('id',pickIds);
+  await db.from('races').delete().eq('id',id);
+  endLoad();await loadAll();
+}
+
+function toggleR(id){S.races.forEach(r=>r._show=(r.id===id?!r._show:false));renderRaces();}
+
+async function saveRes(id){
+  const r=S.races.find(x=>x.id===id);if(!r)return;
+  const results=[];
+  for(let i=1;i<=10;i++){const s=document.getElementById(`rs-${id}-${i}`);if(s&&s.value)results.push(s.value);}
+  r._show=false;startLoad();
+  const{error}=await db.from('races').update({results}).eq('id',id);
+  endLoad();
+  if(error){toast('Error: '+error.message,'err');return;}
+  await loadAll();
+  const w=results[0];
+  if(w){
+    const wps=S.picks.filter(pk=>pk.rid===id&&pk.drivers&&pk.drivers.includes(w));
+    if(wps.length){
+      const names=wps.map(pk=>{const p=S.participants.find(x=>x.id===pk.pid);return p?p.name:'?'}).join(' & ');
+      setTimeout(()=>confetti(names),200);
+    }
+  }
+}
+
+async function addParticipant(){
+  const name=document.getElementById('pnm').value.trim();
+  if(!name){toast('Name required','warn');return;}
+  if(S.participants.find(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Already exists!','warn');return;}
+  startLoad();
+  const{error}=await db.from('participants').insert({id:uid(),name});
+  endLoad();
+  if(error){toast('Error: '+error.message,'err');return;}
+  document.getElementById('pnm').value='';
+  await loadAll();toast(`${name} added ✓`,'ok');
+}
+
+async function delPart(id){
+  if(!confirm('Remove this participant and all their picks?'))return;
+  startLoad();
+  const pickIds=S.picks.filter(p=>p.pid===id).map(p=>p.id);
+  if(pickIds.length)await db.from('picks').delete().in('id',pickIds);
+  await db.from('participants').delete().eq('id',id);
+  endLoad();await loadAll();
+}
+
+// ══════════════════════════════════════════════════════════════
+// CONFETTI
+// ══════════════════════════════════════════════════════════════
+function confetti(){
+  const w=document.getElementById('cw');w.innerHTML='';
+  const cols=['#ffd100','#e8001c','#00e676','#2979ff','#ff6d00','#fff'];
+  for(let i=0;i<90;i++){
+    const el=document.createElement('div');el.className='cp';
+    el.style.cssText=`left:${Math.random()*100}%;background:${cols[Math.floor(Math.random()*cols.length)]};border-radius:${Math.random()>.5?'50%':'2px'};width:${7+Math.random()*7}px;height:${7+Math.random()*7}px;animation-duration:${1.8+Math.random()*1.5}s;animation-delay:${Math.random()*1.2}s;--dx:${(Math.random()-.5)*280}px`;
+    w.appendChild(el);
+  }
+  setTimeout(()=>w.innerHTML='',5000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// LIVE RACE FEED
+// ══════════════════════════════════════════════════════════════
+let feedInt=null,dLap=1,dPos={};
+const FL={1:'🟢 GREEN',2:'🟡 CAUTION',3:'🔴 RED',8:'🏁 CHECKERED',9:'🔴 RED',4:'🟡 PIT ROAD',5:'⚠️ DELAY'};
+const FC={1:'flb flg',2:'flb fly',3:'flb flr',8:'flb flc',9:'flb flr',4:'flb fly',5:'flb fly'};
+
+function linkedRID(){return document.getElementById('lrs').value}
+function linkedPicks(){
+  const rid=linkedRID();if(!rid)return[];
+  return S.participants.map(p=>{const pk=S.picks.find(x=>x.pid===p.id&&x.rid===rid);return{participant:p,drivers:(pk&&pk.drivers)||[]};}).filter(x=>x.drivers.length);
+}
+
+function goLive(){
+  const rid=document.getElementById('nrid').value.trim();const ser=document.getElementById('nseries').value;
+  if(!rid){toast('Enter a NASCAR Race ID','warn');return;}
+  stopFeed();showTrack();fetchLive(rid,ser);
+  feedInt=setInterval(()=>fetchLive(rid,ser),10000);
+  document.getElementById('stopbtn').style.display='';
+  document.getElementById('dbnr').style.display='none';
+}
+
+async function fetchLive(rid,ser){
+  try{
+    const res=await fetch(`https://feeds.nascar.com/feeds/live/series/${ser}/race/${rid}/live_feed.json`);
+    if(!res.ok)throw new Error(res.status);
+    updateGraphic(await res.json());
+    document.getElementById('rts').textContent='Updated '+new Date().toLocaleTimeString();
+    document.getElementById('lpill').style.display='flex';
+  }catch{document.getElementById('rts').textContent='⚠️ Feed unavailable — retrying...';}
+}
+
+function goDemo(){
+  stopFeed();showTrack();
+  const picks=linkedPicks().flatMap(x=>x.drivers);
+  const all=[...new Set([...picks,...getDRV().slice(0,36)])];
+  all.forEach((d,i)=>dPos[d]=i+1);dLap=1;
+  document.getElementById('dbnr').style.display='block';
+  document.getElementById('lpill').style.display='flex';
+  document.getElementById('stopbtn').style.display='';
+  demoFrame();feedInt=setInterval(demoFrame,2000);
+}
+
+function demoFrame(){
+  dLap=Math.min(dLap+Math.ceil(Math.random()*5),200);
+  const keys=Object.keys(dPos);
+  for(let i=0;i<6;i++){const a=keys[Math.floor(Math.random()*keys.length)],b=keys[Math.floor(Math.random()*keys.length)];if(a!==b)[dPos[a],dPos[b]]=[dPos[b],dPos[a]];}
+  const vehicles=keys.map(d=>({driver_name:d,position:dPos[d],laps_completed:dLap,speed:(178+Math.random()*22).toFixed(1),status:'Running',delta:dPos[d]===1?'0.000':`+${(Math.random()*9).toFixed(3)}`}));
+  updateGraphic({lap_number:dLap,total_laps:200,race_name:'Demo 500 — Your Picks',flag_state:dLap>195?8:Math.random()<.08?2:1,vehicles});
+  document.getElementById('rts').textContent='Demo — '+new Date().toLocaleTimeString();
+}
+
+function stopFeed(){
+  if(feedInt)clearInterval(feedInt);feedInt=null;
+  document.getElementById('lpill').style.display='none';
+  document.getElementById('stopbtn').style.display='none';
+}
+function showTrack(){document.getElementById('lrw').style.display='block';}
+
+function updateGraphic(data){
+  const{lap_number:lap,total_laps:tot,race_name:rname,flag_state:fs=1,vehicles:vs=[]}=data;
+  document.getElementById('lrname').textContent=rname||'Live Race';
+  document.getElementById('lcl').textContent=lap||'—';
+  document.getElementById('ltl').textContent=tot||'—';
+  const flg=document.getElementById('flg');flg.textContent=FL[fs]||'—';flg.className=FC[fs]||'flb flg';
+  const sorted=[...vs].sort((a,b)=>(a.position||999)-(b.position||999));
+  const leader=sorted[0];
+  document.getElementById('sb1').textContent=leader?last(leader.driver_name):'—';
+  document.getElementById('sb2v').textContent=leader&&leader.speed?parseFloat(leader.speed).toFixed(0):'—';
+  document.getElementById('sb3').textContent=vs.filter(v=>!v.status||v.status==='Running').length||vs.length;
+  document.getElementById('sb4').textContent=tot&&lap?Math.round(lap/tot*100)+'%':'—';
+  const picks=linkedPicks();const tbg=document.getElementById('tbg');
+  if(!picks.length){tbg.innerHTML=`<div class="fline"></div><div class="nrbox"><span class="bi">🎯</span><h3>No Picks Linked</h3><p>Link a race above so participants' drivers appear on track.</p></div>`;return;}
+  const total=sorted.length||36;
+  const lanes=picks.map(({participant,drivers})=>{
+    const dvs=drivers.map(d=>{const v=vs.find(x=>fuzzy(x.driver_name,d));return{driver:d,v,pos:v?v.position:null};}).sort((a,b)=>(a.pos||9999)-(b.pos||9999));
+    const best=dvs[0];const pos=best.pos;
+    const pct=pos?((total-pos)/(total-1)):0;const left=5+pct*82;
+    const isLd=pos===1;const c=AVC[S.participants.findIndex(x=>x.id===participant.id)%AVC.length];
+    const lbl=pos?`P${pos}`:best.v?'OUT':'?';
+    return`<div class="lane ${isLd?'ld':''}">
+      <div class="li">
+        <span class="av" style="background:${c}22;color:${c};border:1px solid ${c}44;width:24px;height:24px;font-size:12px">${participant.name[0]}</span>
+        <div><div class="ln" style="color:${c}">${participant.name}</div>
+          <div class="ld2">${dvs.map(x=>`<span class="nbadge ${carData(x.driver).cls}" style="background:${carData(x.driver).bg};color:${carData(x.driver).fg};font-size:9px;height:14px;min-width:18px;margin-right:1px">${carData(x.driver).n}</span>`).join('')}</div>
+        </div>
+      </div>
+      <div class="ltrack"><div class="tline"></div>
+        <div class="cm" style="left:${left.toFixed(1)}%;color:${c}">
+          <span class="ci mv">🏎️</span>
+          <span class="cpb" style="border-color:${c};color:${c}">${lbl}</span>
+        </div>
+      </div>
+      <div class="ls"><div class="lpos" style="color:${isLd?'var(--y)':'var(--txt)'}">${lbl}</div>
+        <div class="lgap">${isLd&&best.v?parseFloat(best.v.speed||0).toFixed(0)+' mph':best.v&&best.v.delta&&best.v.delta!=='0.000'?best.v.delta:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+  tbg.innerHTML=`<div class="fline"></div>${lanes}`;
+}
+
+function last(n){if(!n)return'—';const p=n.split(' ');return p.length>1?p[p.length-1]:n;}
+function fuzzy(a='',b=''){a=a.toLowerCase().trim();b=b.toLowerCase().trim();if(a===b)return true;return a.split(' ').pop()===b.split(' ').pop();}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+(async()=>{
+  const ok=await initFromConfig();
+  if(ok){
+    await loadAll();
+    subscribeRealtime();
+  }
+  // Default date fields
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    document.getElementById('rdate').value=today;
+    document.getElementById('h-date').value=today;
+  }catch{}
+  // Settings gear shows disconnect option
+  document.getElementById('settings-btn').addEventListener('click',()=>{
+    document.getElementById('settings-section').style.display='block';
+    openMore('settings');
+  });
+})();
+</script>
+</body>
+</html>
