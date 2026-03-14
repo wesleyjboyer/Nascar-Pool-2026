@@ -622,7 +622,7 @@ function getCars(){
 }
 function carData(n){const c=getCars();return c[n]||{n:"—",bg:"#333",fg:"#aaa",cls:"misc"}}
 function getDRV(){return Object.keys(getCars()).sort()}
-function dTag(name,size=14){const c=carData(name);return`<span class="drow"><span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg};font-size:${size}px">${c.n}</span><span class="dname">${name}</span></span>`}
+function dTag(name,size=16){const c=carData(name);return`<span class="drow"><span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg};font-size:${size}px">${c.n}</span><span class="dname">${name}</span></span>`}
 function numOnly(name){const c=carData(name);return`<span class="nbadge ${c.cls}" style="background:${c.bg};color:${c.fg}">${c.n}</span>`}
 function drvOption(d){return`<option value="${d}">${carData(d).n} · ${d}</option>`}
 
