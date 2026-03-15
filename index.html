@@ -1274,19 +1274,17 @@ function linkedPicks(){
 }
 
 function goLive(){
-  const rid=document.getElementById('nrid').value.trim();const ser=document.getElementById('nseries').value;
+  const rid=document.getElementById('nrid').value.trim();
   if(!rid){toast('Enter a NASCAR Race ID','warn');return;}
-  stopFeed();showTrack();fetchLive(rid,ser);
-  feedInt=setInterval(()=>fetchLive(rid,ser),10000);
+  stopFeed();showTrack();fetchLive(rid);
+  feedInt=setInterval(()=>fetchLive(rid),10000);
   document.getElementById('stopbtn').style.display='';
   document.getElementById('dbnr').style.display='none';
 }
 
-async function fetchLive(rid,ser){
+async function fetchLive(rid){
   try{
     const res=await fetch(`https://cf.nascar.com/cacher/live/series_1/${rid}/live-feed.json`);
-    //https://cf.nascar.com/cacher/live/${ser}/${rid}/live-feed.json
-    //https://feeds.nascar.com/feeds/live/series/${ser}/race/${rid}/live_feed.json
     if(!res.ok)throw new Error(res.status);
     updateGraphic(await res.json());
     document.getElementById('rts').textContent='Updated '+new Date().toLocaleTimeString();
@@ -1322,30 +1320,71 @@ function stopFeed(){
 function showTrack(){document.getElementById('lrw').style.display='block';}
 
 function updateGraphic(data){
-  const{lap_number:lap,total_laps:tot,race_name:rname,flag_state:fs=1,vehicles:vs=[]}=data;
-  document.getElementById('lrname').textContent=rname||'Live Race';
-  document.getElementById('lcl').textContent=lap||'—';
-  document.getElementById('ltl').textContent=tot||'—';
-  const flg=document.getElementById('flg');flg.textContent=FL[fs]||'—';flg.className=FC[fs]||'flb flg';
-  const sorted=[...vs].sort((a,b)=>(a.position||999)-(b.position||999));
-  const leader=sorted[0];
-  document.getElementById('sb1').textContent=leader?last(leader.driver_name):'—';
-  document.getElementById('sb2v').textContent=leader&&leader.speed?parseFloat(leader.speed).toFixed(0):'—';
-  document.getElementById('sb3').textContent=vs.filter(v=>!v.status||v.status==='Running').length||vs.length;
-  document.getElementById('sb4').textContent=tot&&lap?Math.round(lap/tot*100)+'%':'—';
-  const picks=linkedPicks();const tbg=document.getElementById('tbg');
-  if(!picks.length){tbg.innerHTML=`<div class="fline"></div><div class="nrbox"><span class="bi">🎯</span><h3>No Picks Linked</h3><p>Link a race above so participants' drivers appear on track.</p></div>`;return;}
-  const total=sorted.length||36;
-  const lanes=picks.map(({participant,drivers})=>{
-    const dvs=drivers.map(d=>{const v=vs.find(x=>fuzzy(x.driver_name,d));return{driver:d,v,pos:v?v.position:null};}).sort((a,b)=>(a.pos||9999)-(b.pos||9999));
-    const best=dvs[0];const pos=best.pos;
-    const pct=pos?((total-pos)/(total-1)):0;const left=5+pct*82;
-    const isLd=pos===1;const c=AVC[S.participants.findIndex(x=>x.id===participant.id)%AVC.length];
-    const lbl=pos?`P${pos}`:best.v?'OUT':'?';
-    return`<div class="lane ${isLd?'ld':''}">
+  // Field mapping for cf.nascar.com API
+  const lap    = data.lap_number;
+  const tot    = data.laps_in_race;
+  const rname  = data.run_name;
+  const fs     = data.flag_state || 1;
+  const vs     = data.vehicles   || [];
+
+  document.getElementById('lrname').textContent = rname || 'Live Race';
+  document.getElementById('lcl').textContent    = lap   || '—';
+  document.getElementById('ltl').textContent    = tot   || '—';
+
+  const flg = document.getElementById('flg');
+  flg.textContent = FL[fs] || '—';
+  flg.className   = FC[fs] || 'flb flg';
+
+  // Sort by running_position (not position)
+  const sorted = [...vs].sort((a,b) => (a.running_position||999) - (b.running_position||999));
+  const leader = sorted[0];
+
+  document.getElementById('sb1').textContent  = leader ? last(leader.driver.full_name) : '—';
+  // Use last_lap_speed; leader delta is 0 so show speed
+  document.getElementById('sb2v').textContent = leader && leader.last_lap_speed
+    ? parseFloat(leader.last_lap_speed).toFixed(0) : '—';
+  // status === 1 means running (it's numeric, not a string)
+  document.getElementById('sb3').textContent  = vs.filter(v => v.status === 1).length || vs.length;
+  document.getElementById('sb4').textContent  = tot && lap ? Math.round(lap/tot*100)+'%' : '—';
+
+  const picks = linkedPicks();
+  const tbg   = document.getElementById('tbg');
+
+  if(!picks.length){
+    tbg.innerHTML=`<div class="fline"></div><div class="nrbox"><span class="bi">🎯</span><h3>No Picks Linked</h3><p>Link a race above so participants' drivers appear on track.</p></div>`;
+    return;
+  }
+
+  const total = sorted.length || 36;
+
+  const lanes = picks.map(({participant, drivers}) => {
+    // Match on driver.full_name instead of driver_name
+    const dvs = drivers.map(d => {
+      const v = vs.find(x => fuzzy(x.driver.full_name, d));
+      return { driver:d, v, pos: v ? v.running_position : null };
+    }).sort((a,b) => (a.pos||9999) - (b.pos||9999));
+
+    const best  = dvs[0];
+    const pos   = best.pos;
+    const pct   = pos ? ((total - pos) / (total - 1)) : 0;
+    const left  = 5 + pct * 82;
+    const isLd  = pos === 1;
+    const c     = AVC[S.participants.findIndex(x => x.id === participant.id) % AVC.length];
+    const lbl   = pos ? `P${pos}` : best.v ? 'OUT' : '?';
+
+    // Delta: 0 = leader, -1 = lapped, otherwise seconds back
+    const deltaVal = best.v ? best.v.delta : null;
+    const gapText  = isLd && best.v
+      ? parseFloat(best.v.last_lap_speed||0).toFixed(0)+' mph'
+      : deltaVal != null && deltaVal >= 0
+        ? '+'+deltaVal.toFixed(3)+'s'
+        : deltaVal === -1 ? 'LAPPED' : '';
+
+    return `<div class="lane ${isLd?'ld':''}">
       <div class="li">
         <span class="av" style="background:${c}22;color:${c};border:1px solid ${c}44;width:24px;height:24px;font-size:12px">${participant.name[0]}</span>
-        <div><div class="ln" style="color:${c}">${participant.name}</div>
+        <div>
+          <div class="ln" style="color:${c}">${participant.name}</div>
           <div class="ld2">${dvs.map(x=>`<span class="nbadge ${carData(x.driver).cls}" style="background:${carData(x.driver).bg};color:${carData(x.driver).fg};font-size:9px;height:14px;min-width:18px;margin-right:1px">${carData(x.driver).n}</span>`).join('')}</div>
         </div>
       </div>
@@ -1355,12 +1394,14 @@ function updateGraphic(data){
           <span class="cpb" style="border-color:${c};color:${c}">${lbl}</span>
         </div>
       </div>
-      <div class="ls"><div class="lpos" style="color:${isLd?'var(--y)':'var(--txt)'}">${lbl}</div>
-        <div class="lgap">${isLd&&best.v?parseFloat(best.v.speed||0).toFixed(0)+' mph':best.v&&best.v.delta&&best.v.delta!=='0.000'?best.v.delta:''}</div>
+      <div class="ls">
+        <div class="lpos" style="color:${isLd?'var(--y)':'var(--txt)'}">${lbl}</div>
+        <div class="lgap">${gapText}</div>
       </div>
     </div>`;
   }).join('');
-  tbg.innerHTML=`<div class="fline"></div>${lanes}`;
+
+  tbg.innerHTML = `<div class="fline"></div>${lanes}`;
 }
 
 function last(n){if(!n)return'—';const p=n.split(' ');return p.length>1?p[p.length-1]:n;}
