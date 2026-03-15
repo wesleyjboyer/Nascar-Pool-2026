@@ -1390,7 +1390,17 @@ function updateGraphic(data){
       </div>
       <div class="ltrack"><div class="tline"></div>
         <div class="cm" style="left:${left.toFixed(1)}%;color:${c}">
-          <span class="ci mv">🏎️</span>
+          <span class="ci mv" style="font-size:inherit;filter:none">
+            <span class="nbadge ${carData(best.driver).cls}" style="
+              background:${carData(best.driver).bg};
+              color:${carData(best.driver).fg};
+              font-size:15px;
+              min-width:32px;
+              height:26px;
+              border-radius:3px;
+              box-shadow:0 0 8px ${carData(best.driver).bg}99;
+            ">${carData(best.driver).n}</span>
+          </span>
           <span class="cpb" style="border-color:${c};color:${c}">${lbl}</span>
         </div>
       </div>
