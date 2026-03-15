@@ -1284,7 +1284,7 @@ function goLive(){
 
 async function fetchLive(rid,ser){
   try{
-    const res=await fetch(`https://feeds.nascar.com/feeds/live/series/${ser}/race/${rid}/live_feed.json`);
+    const res=await fetch(`https://cf.nascar.com/cacher/live/${ser}/${rid}/live-feed.json`);
     //https://cf.nascar.com/cacher/live/${ser}/${rid}/live-feed.json
     //https://feeds.nascar.com/feeds/live/series/${ser}/race/${rid}/live_feed.json
     if(!res.ok)throw new Error(res.status);
