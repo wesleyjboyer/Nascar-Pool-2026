@@ -1503,20 +1503,19 @@ function demoFrame(){
 }
 
 // ══════════════════════════════════════════════════════════════
-// OVAL TRACK ANIMATION ENGINE
+// OVAL TRACK ANIMATION ENGINE  v2 — predict + blend
 // ══════════════════════════════════════════════════════════════
 
 const OT = {
-  cars:     {},    // participantId → car state object
-  rafId:    null,
-  lastTs:   null,
+  cars:  {},   // key → car state
+  rafId: null,
 };
 
-// Convert 0-1 track fraction → {x%, y%} on the 600×260 SVG viewBox
-// fraction=0 is start/finish (top of front straight), CCW travel
-function ovalXY(frac) {
-  const cx = 300, cy = 130, rx = 247, ry = 97;
-  // CCW: angle goes positive as fraction increases, start at top (-π/2)
+// ── Oval geometry ──────────────────────────────────────────────
+// Returns {px, py} as percentages within the #oval-wrap div
+// fraction 0 = start/finish (top of front straight), advances CCW
+function ovalXY(frac){
+  const cx=300, cy=130, rx=247, ry=97;
   const angle = -frac * Math.PI * 2 - Math.PI / 2;
   return {
     px: (cx + rx * Math.cos(angle)) / 600 * 100,
@@ -1524,101 +1523,171 @@ function ovalXY(frac) {
   };
 }
 
-// Calculate a car's fractional track position from live feed data
-// Returns value in [0, 1)
-function calcTrackFrac(v, leaderElapsed, leaderLapTime) {
-  if (!v.is_on_track) return null; // in pits
-
-  const lapTime = v.last_lap_time > 5 ? v.last_lap_time : (leaderLapTime || 30);
-
-  if (v.running_position === 1) {
-    // Leader: use elapsed time mod lap time
-    const frac = (v.vehicle_elapsed_time % lapTime) / lapTime;
-    return ((1 - frac) % 1 + 1) % 1; // invert because CCW: 0=S/F, increasing = forward
-  }
-
-  // delta = seconds behind leader on track (can be > lapTime if lapped)
-  const delta = v.delta >= 0 ? v.delta : (lapTime * 1.5); // treat -1 as ~1.5 laps behind
-  const leaderFrac = (1 - ((leaderElapsed % lapTime) / lapTime) + 1) % 1;
-  const carFrac = (leaderFrac - delta / lapTime % 1 + 2) % 1;
-  return carFrac;
+// ── Shortest angular path on a 0-1 circle ─────────────────────
+function circularDiff(from, to){
+  let d = to - from;
+  if(d >  0.5) d -= 1;
+  if(d < -0.5) d += 1;
+  return d;
 }
 
-function startOvalAnimation() {
-  if (OT.rafId) return;
-  OT.lastTs = null;
+// ── Convert live feed vehicle → track fraction 0-1 ────────────
+function calcTrackFrac(v, leaderV){
+  if(!v.is_on_track) return null;
+
+  const lapTime = (v.last_lap_time > 5 ? v.last_lap_time : null)
+               || (leaderV?.last_lap_time > 5 ? leaderV.last_lap_time : null)
+               || 30;
+
+  if(v.running_position === 1){
+    // Leader: derive position from elapsed time mod lap time
+    const raw = (v.vehicle_elapsed_time % lapTime) / lapTime;
+    return ((1 - raw) % 1 + 1) % 1;  // CCW: 0 = S/F, increasing = forward
+  }
+
+  // Everyone else: offset behind leader by delta seconds
+  const leaderLT  = leaderV?.last_lap_time > 5 ? leaderV.last_lap_time : 30;
+  const leaderRaw = (leaderV?.vehicle_elapsed_time % leaderLT) / leaderLT;
+  const leaderFrac = ((1 - leaderRaw) % 1 + 1) % 1;
+
+  // delta = gap in seconds; cap lapped cars at 0.85 laps back
+  const gapSecs = (v.delta >= 0) ? v.delta : leaderLT * 0.85;
+  const gapFrac = Math.min(gapSecs / lapTime, 0.85);
+  return ((leaderFrac - gapFrac) % 1 + 1) % 1;
+}
+
+// ── Animation loop ─────────────────────────────────────────────
+function startOvalAnimation(){
+  if(OT.rafId) return;
   OT.rafId = requestAnimationFrame(ovalFrame);
 }
 
-function stopOvalAnimation() {
-  if (OT.rafId) cancelAnimationFrame(OT.rafId);
+function stopOvalAnimation(){
+  if(OT.rafId) cancelAnimationFrame(OT.rafId);
   OT.rafId = null;
 }
 
-function ovalFrame(ts) {
-  if (!OT.lastTs) OT.lastTs = ts;
-  const dt = Math.min((ts - OT.lastTs) / 1000, 0.08); // cap at 80ms
-  OT.lastTs = ts;
+function ovalFrame(ts){
+  const now = ts / 1000; // seconds
 
-  for (const state of Object.values(OT.cars)) {
-    if (!state.isOnTrack || state.targetFrac === null) continue;
+  for(const state of Object.values(OT.cars)){
+    if(!state.isOnTrack || state.anchorFrac === null) continue;
 
-    // Dead-reckon: advance at natural lap speed
-    const speed = 1 / (state.lapTime || 30); // fractions-per-second
-    state.displayFrac = (state.displayFrac + speed * dt + 1) % 1;
+    // 1. Predict where the car SHOULD be right now based on speed
+    const speed   = 1 / (state.smoothLapTime || 30); // fractions/sec
+    const elapsed = now - state.anchorTime;
+    const predicted = ((state.anchorFrac + speed * elapsed) % 1 + 1) % 1;
 
-    // Soft correction toward target (avoids snapping)
-    let diff = state.targetFrac - state.displayFrac;
-    if (diff >  0.5) diff -= 1;
-    if (diff < -0.5) diff += 1;
-
-    if (Math.abs(diff) > 0.12) {
-      // Hard re-sync if too far off (e.g. first data load)
-      state.displayFrac = state.targetFrac;
-    } else if (Math.abs(diff) > 0.005) {
-      // Gentle nudge — ~3% correction per frame
-      state.displayFrac = ((state.displayFrac + diff * 0.03) + 1) % 1;
-    }
+    // 2. Blend displayFrac toward predicted — soft enough to feel smooth,
+    //    fast enough to stay accurate. ~0.08 = reaches target in ~0.3s
+    const diff = circularDiff(state.displayFrac, predicted);
+    state.displayFrac = ((state.displayFrac + diff * 0.08) % 1 + 1) % 1;
   }
 
   renderOvalCars();
   OT.rafId = requestAnimationFrame(ovalFrame);
 }
 
-function renderOvalCars() {
+// ── Render all cars to DOM ─────────────────────────────────────
+function renderOvalCars(){
   const carsEl = document.getElementById('oval-cars');
   const pitsEl = document.getElementById('oval-pits');
-  if (!carsEl || !pitsEl) return;
+  if(!carsEl || !pitsEl) return;
 
-  const onTrack = Object.values(OT.cars).filter(s => s.isOnTrack)
-    .sort((a, b) => a.pos - b.pos);
-  const inPits  = Object.values(OT.cars).filter(s => !s.isOnTrack)
-    .sort((a, b) => a.pos - b.pos);
+  const onTrack = Object.values(OT.cars)
+    .filter(s =>  s.isOnTrack)
+    .sort((a,b) => a.pos - b.pos);
 
-  // Render on-track cars
-  carsEl.innerHTML = onTrack.map(state => {
-    const {px, py} = ovalXY(state.displayFrac);
-    const isLd = state.pos === 1;
-    const c = state.color;
+  const inPits  = Object.values(OT.cars)
+    .filter(s => !s.isOnTrack)
+    .sort((a,b) => a.pos - b.pos);
+
+  carsEl.innerHTML = onTrack.map(s => {
+    const {px, py} = ovalXY(s.displayFrac);
+    const isLd = s.pos === 1;
     return `<div class="oval-car${isLd?' leader':''}"
                  style="left:${px.toFixed(2)}%;top:${py.toFixed(2)}%">
-      <span class="oc-pos" style="color:${c}">P${state.pos}</span>
-      <span class="oc-badge ${state.carCls}"
-            style="background:${state.carBg};color:${state.carFg};--glow:${state.carBg}"
-      >${state.carNum}</span>
-      <span class="oc-name" style="color:${c}">${state.partName}</span>
+      <span class="oc-pos" style="color:${s.color}">P${s.pos}</span>
+      <span class="oc-badge ${s.carCls}"
+            style="background:${s.carBg};color:${s.carFg};--glow:${s.carBg}"
+      >${s.carNum}</span>
+      <span class="oc-name" style="color:${s.color}">${s.partName}</span>
     </div>`;
   }).join('');
 
-  // Render pit road cars
-  pitsEl.innerHTML = inPits.map(state => {
-    return `<div class="oval-car pitted" style="position:relative;transform:none;left:auto;top:auto">
-      <span class="oc-badge ${state.carCls}"
-            style="background:${state.carBg};color:${state.carFg};font-size:10px;height:16px;min-width:20px"
-      >${state.carNum}</span>
-      <span class="oc-name" style="color:${state.color}">${state.partName}</span>
-    </div>`;
-  }).join('');
+  pitsEl.innerHTML = inPits.map(s =>
+    `<div class="oval-car pitted"
+          style="position:relative;transform:none;left:auto;top:auto">
+       <span class="oc-badge ${s.carCls}"
+             style="background:${s.carBg};color:${s.carFg};
+                    font-size:10px;height:16px;min-width:20px"
+       >${s.carNum}</span>
+       <span class="oc-name" style="color:${s.color}">${s.partName}</span>
+     </div>`
+  ).join('');
+}
+
+// ── Called by updateGraphic with fresh data ────────────────────
+// Updates each car's prediction anchor — no position snapping
+function updateOvalCars(picks, vs){
+  const now     = performance.now() / 1000;
+  const leaderV = vs.find(v => v.running_position === 1);
+
+  for(const {participant, drivers} of picks){
+    const dvs = drivers
+      .map(d => ({ driver:d, v: vs.find(x => fuzzy(x.driver.full_name, d)) }))
+      .filter(x => x.v)
+      .sort((a,b) => (a.v.running_position||999) - (b.v.running_position||999));
+
+    if(!dvs.length) continue;
+
+    const best = dvs[0];
+    const v    = best.v;
+    const cd   = carData(best.driver);
+    const c    = AVC[S.participants.findIndex(x => x.id === participant.id) % AVC.length];
+    const key  = participant.id;
+
+    const newFrac   = calcTrackFrac(v, leaderV);
+    const newLapTime = v.last_lap_time > 5 ? v.last_lap_time : 30;
+
+    if(!OT.cars[key]){
+      // First time seeing this car — seed display position immediately
+      OT.cars[key] = {
+        displayFrac:    newFrac !== null ? newFrac : 0,
+        anchorFrac:     newFrac,
+        anchorTime:     now,
+        smoothLapTime:  newLapTime,
+        isOnTrack:      v.is_on_track,
+        pos:            v.running_position,
+        carNum:         cd.n,
+        carBg:          cd.bg,
+        carFg:          cd.fg,
+        carCls:         cd.cls,
+        color:          c,
+        partName:       participant.name,
+      };
+    } else {
+      const state = OT.cars[key];
+
+      // Smooth lap time with exponential moving average — prevents
+      // sudden speed changes from causing a lurch
+      state.smoothLapTime = state.smoothLapTime * 0.8 + newLapTime * 0.2;
+
+      // Update prediction anchor to latest known position + timestamp
+      // The rAF loop will smoothly predict forward from here
+      if(newFrac !== null){
+        state.anchorFrac = newFrac;
+        state.anchorTime = now;
+      }
+
+      state.isOnTrack = v.is_on_track;
+      state.pos       = v.running_position;
+      state.carNum    = cd.n;
+      state.carBg     = cd.bg;
+      state.carFg     = cd.fg;
+      state.color     = c;
+    }
+  }
 }
   
 function stopFeed() {
@@ -1662,9 +1731,9 @@ function updateGraphic(data){
   // ── No picks linked ──
   const picks = linkedPicks();
   const wrap  = document.getElementById('oval-wrap');
-  if (!wrap) return;
+  if(!wrap) return;
 
-  if (!picks.length) {
+  if(!picks.length){
     document.getElementById('oval-cars').innerHTML =
       `<div style="position:absolute;inset:0;display:flex;align-items:center;
                    justify-content:center;color:var(--mut);font-size:13px;
@@ -1675,60 +1744,7 @@ function updateGraphic(data){
     return;
   }
 
-  // ── Calculate target positions for each participant's best driver ──
-  const leaderV   = vs.find(v => v.running_position === 1);
-  const leaderET  = leaderV?.vehicle_elapsed_time || 0;
-  const leaderLT  = leaderV?.last_lap_time || 30;
-
-  for (const {participant, drivers} of picks) {
-    // Find best-positioned driver for this participant
-    const dvs = drivers
-      .map(d => ({
-        driver: d,
-        v: vs.find(x => fuzzy(x.driver.full_name, d))
-      }))
-      .filter(x => x.v)
-      .sort((a,b) => (a.v.running_position||999) - (b.v.running_position||999));
-
-    if (!dvs.length) continue;
-    const best = dvs[0];
-    const v    = best.v;
-    const cd   = carData(best.driver);
-    const c    = AVC[S.participants.findIndex(x => x.id === participant.id) % AVC.length];
-    const key  = participant.id;
-
-    const targetFrac = calcTrackFrac(v, leaderET, leaderLT);
-
-    if (!OT.cars[key]) {
-      // First time — initialise display position to target
-      OT.cars[key] = {
-        displayFrac: targetFrac !== null ? targetFrac : 0,
-        targetFrac:  targetFrac,
-        lapTime:     v.last_lap_time || 30,
-        isOnTrack:   v.is_on_track,
-        pos:         v.running_position,
-        carNum:      cd.n,
-        carBg:       cd.bg,
-        carFg:       cd.fg,
-        carCls:      cd.cls,
-        color:       c,
-        partName:    participant.name,
-      };
-    } else {
-      // Update targets — display position advances smoothly via rAF
-      const state = OT.cars[key];
-      state.targetFrac = targetFrac;
-      state.lapTime    = v.last_lap_time > 5 ? v.last_lap_time : state.lapTime;
-      state.isOnTrack  = v.is_on_track;
-      state.pos        = v.running_position;
-      state.carNum     = cd.n;
-      state.carBg      = cd.bg;
-      state.carFg      = cd.fg;
-      state.color      = c;
-    }
-  }
-
-  // Kick off animation loop if not already running
+  updateOvalCars(picks, vs);
   startOvalAnimation();
 }
 function last(n){if(!n)return'—';const p=n.split(' ');return p.length>1?p[p.length-1]:n;}
