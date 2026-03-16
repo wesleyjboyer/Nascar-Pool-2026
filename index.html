@@ -261,11 +261,16 @@ select option{background:#1c1c1c}
 #oval-wrap{
   position:relative;
   width:100%;
-  padding-bottom:43.4%; /* 260/600 aspect ratio */
+  aspect-ratio:600/260;
+  padding-bottom:0;
   background:#0e0e0e;
   border:1px solid var(--brd);
   border-radius:4px;
   overflow:hidden;
+  touch-action:none;
+}
+@supports not (aspect-ratio:1){
+  #oval-wrap{padding-bottom:43.4%}
 }
 
 /* car badge on the oval */
@@ -340,37 +345,47 @@ select option{background:#1c1c1c}
   #mob-nav{display:flex}
   #desk-nav{display:none}
   main{padding:14px 12px;padding-bottom:calc(var(--mob-nav-h) + env(safe-area-inset-bottom) + 10px)}
-
-  /* draft: stack single column */
   .draft-layout{grid-template-columns:1fr}
   .draft-pool{position:static;margin-top:14px}
-
-  /* race items: stack */
   .ri{flex-direction:column;gap:8px}
   .ri-actions{flex-direction:row}
-
-  /* results grid: 2 col */
   .rgrid{grid-template-columns:1fr 1fr}
-
-  /* stat grid: 2 col */
   .cgrid{grid-template-columns:1fr 1fr}
-
-  /* history pick rows: stack */
   .part-pick-row{flex-direction:column;align-items:flex-start}
-
-  /* live race: narrower columns */
   .lane{grid-template-columns:100px 1fr 44px}
   .ln{font-size:12px}
   .lpos{font-size:18px}
-
-  /* leaderboard: hide entered col */
   .lb-hide-mob{display:none}
-
-  /* season grid: always scroll */
   .season-grid-wrap{margin:0 -12px;padding:0 12px}
+
+  /* ── OVAL TRACK MOBILE ── */
+  .tarea{padding:8px 10px}
+  .rhb{padding:8px 12px;gap:8px}
+  .rhn{font-size:16px}
+  .laps{font-size:12px}
+  .flb{font-size:10px;padding:2px 6px}
+
+  .oval-car .oc-badge{font-size:10px;min-width:20px;height:16px;padding:0 3px}
+  .oval-car .oc-name{font-size:7px;max-width:44px}
+  .oval-car .oc-pos{font-size:8px}
+
+  .sbar{display:grid;grid-template-columns:1fr 1fr}
+  .sb2{border-right:1px solid var(--brd);border-bottom:1px solid var(--brd)}
+  .sb2:nth-child(2){border-right:none}
+  .sb2:nth-child(3){border-bottom:none}
+  .sb2:nth-child(4){border-right:none;border-bottom:none}
+  .sb2 .sv{font-size:15px}
+  .sb2 .sl{font-size:9px}
+
+  #oval-pits{max-width:120px;gap:3px}
+  #oval-pits .oc-badge{font-size:9px;min-width:16px;height:14px}
+  #oval-pits .oc-name{font-size:6px;max-width:36px}
 }
+
 @media(max-width:400px){
   .lane{grid-template-columns:80px 1fr 36px}
+  .oval-car .oc-badge{font-size:9px;min-width:18px;height:14px}
+  .oval-car .oc-name{display:none}
 }
 </style>
 </head>
@@ -1017,6 +1032,7 @@ function go(n){
   if(di>=0)document.querySelectorAll('#desk-nav button')[di].classList.add('on');
   if(MOB_TABS.includes(n)){const mb=document.getElementById('mnav-'+n);if(mb)mb.classList.add('on');}
   else{document.getElementById('mnav-more').classList.add('on');}
+  if(n === 'live') setTimeout(()=> OT.cars && renderOvalCars(), 50);
   render();
 }
 
@@ -1701,16 +1717,21 @@ function renderOvalCars(){
   const onTrack = Object.values(OT.cars)
     .filter(s =>  s.isOnTrack)
     .sort((a,b) => a.pos - b.pos);
-
   const inPits  = Object.values(OT.cars)
     .filter(s => !s.isOnTrack)
     .sort((a,b) => a.pos - b.pos);
 
+  // Clamp x/y so badges don't bleed outside the wrap on small screens
+  function clamp(v, min, max){ return Math.min(Math.max(v, min), max); }
+
   carsEl.innerHTML = onTrack.map(s => {
     const {px, py} = ovalXY(s.displayFrac);
+    // Keep badge anchor 8% inside each edge so labels stay visible
+    const cx = clamp(px, 8, 92);
+    const cy = clamp(py, 8, 92);
     const isLd = s.pos === 1;
     return `<div class="oval-car${isLd?' leader':''}"
-                 style="left:${px.toFixed(2)}%;top:${py.toFixed(2)}%">
+                 style="left:${cx.toFixed(2)}%;top:${cy.toFixed(2)}%">
       <span class="oc-pos" style="color:${s.color}">P${s.pos}</span>
       <span class="oc-badge ${s.carCls}"
             style="background:${s.carBg};color:${s.carFg};--glow:${s.carBg}"
