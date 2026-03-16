@@ -720,6 +720,13 @@ const DEFAULT_CARS={
   "Ryan Preece":         {n:"37", bg:"#3a3a3a",fg:"#aaa", cls:"misc"},
 };
 
+function safeSet(id, val){
+  const el = document.getElementById(id);
+  if(el) el.textContent = val;
+  else console.warn('Missing element:', id);
+}
+
+  
 // ── DRIVER HELPERS ──
 function getCars(){
   const merged=Object.assign({},DEFAULT_CARS,S.drivers||{});
@@ -1618,32 +1625,30 @@ function showTrack(){document.getElementById('lrw').style.display='block';}
 // ══════════════════════════════════════════════════════════════
 // UPDATED updateGraphic — now feeds the oval animation engine
 // ══════════════════════════════════════════════════════════════
-function updateGraphic(data) {
+function updateGraphic(data){
   const lap   = data.lap_number;
   const tot   = data.laps_in_race;
   const rname = data.run_name;
   const fs    = data.flag_state || 1;
   const vs    = data.vehicles   || [];
 
-  document.getElementById('lrname').textContent = rname || 'Live Race';
-  document.getElementById('lcl').textContent    = lap   || '—';
-  document.getElementById('ltl').textContent    = tot   || '—';
+  safeSet('lrname', rname || 'Live Race');
+  safeSet('lcl',    lap   || '—');
+  safeSet('ltl',    tot   || '—');
+
   const flg = document.getElementById('flg');
-  flg.textContent = FL[fs] || '—';
-  flg.className   = FC[fs] || 'flb flg';
+  if(flg){ flg.textContent = FL[fs] || '—'; flg.className = FC[fs] || 'flb flg'; }
 
   const sorted = [...vs].sort((a,b) =>
     (a.running_position||999) - (b.running_position||999));
   const leader = sorted[0];
 
-  document.getElementById('sb1').textContent =
-    leader ? last(leader.driver.full_name) : '—';
-  document.getElementById('sb2v').textContent =
-    leader?.last_lap_speed ? parseFloat(leader.last_lap_speed).toFixed(0) : '—';
-  document.getElementById('sb3').textContent =
-    vs.filter(v => v.status === 1).length || vs.length;
-  document.getElementById('sb4').textContent =
-    tot && lap ? Math.round(lap/tot*100)+'%' : '—';
+  safeSet('sb1',  leader ? last(leader.driver.full_name) : '—');
+  safeSet('sb2v', leader?.last_lap_speed
+    ? parseFloat(leader.last_lap_speed).toFixed(0) : '—');
+  safeSet('sb3',  vs.filter(v => v.status === 1).length || vs.length);
+  safeSet('sb4',  tot && lap ? Math.round(lap/tot*100)+'%' : '—');
+
 
   // ── No picks linked ──
   const picks = linkedPicks();
