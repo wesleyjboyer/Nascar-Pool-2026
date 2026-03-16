@@ -1403,22 +1403,87 @@ async function fetchLive(rid){
 
 function goDemo(){
   stopFeed();showTrack();
-  const picks=linkedPicks().flatMap(x=>x.drivers);
-  const all=[...new Set([...picks,...getDRV().slice(0,36)])];
-  all.forEach((d,i)=>dPos[d]=i+1);dLap=1;
-  document.getElementById('dbnr').style.display='block';
-  document.getElementById('lpill').style.display='flex';
-  document.getElementById('stopbtn').style.display='';
-  demoFrame();feedInt=setInterval(demoFrame,2000);
+
+  const picks = linkedPicks().flatMap(x => x.drivers);
+  const all   = [...new Set([...picks, ...getDRV().slice(0, 36)])];
+
+  // Build demo vehicles using the real API field shape
+  dPos = {};
+  all.forEach((d, i) => dPos[d] = i + 1);
+  dLap = 1;
+
+  // Seed vehicle_elapsed_time so calcTrackFrac has something to work with
+  dElapsed = {};
+  all.forEach(d => dElapsed[d] = Math.random() * 30); // stagger start positions
+
+  document.getElementById('dbnr').style.display  = 'block';
+  document.getElementById('lpill').style.display = 'flex';
+  document.getElementById('stopbtn').style.display = '';
+
+  demoFrame();
+  feedInt = setInterval(demoFrame, 2000);
 }
 
+// demo elapsed time tracker
+let dElapsed = {};
+
 function demoFrame(){
-  dLap=Math.min(dLap+Math.ceil(Math.random()*5),200);
-  const keys=Object.keys(dPos);
-  for(let i=0;i<6;i++){const a=keys[Math.floor(Math.random()*keys.length)],b=keys[Math.floor(Math.random()*keys.length)];if(a!==b)[dPos[a],dPos[b]]=[dPos[b],dPos[a]];}
-  const vehicles=keys.map(d=>({driver_name:d,position:dPos[d],laps_completed:dLap,speed:(178+Math.random()*22).toFixed(1),status:'Running',delta:dPos[d]===1?'0.000':`+${(Math.random()*9).toFixed(3)}`}));
-  updateGraphic({lap_number:dLap,total_laps:200,race_name:'Demo 500 — Your Picks',flag_state:dLap>195?8:Math.random()<.08?2:1,vehicles});
-  document.getElementById('rts').textContent='Demo — '+new Date().toLocaleTimeString();
+  dLap = Math.min(dLap + Math.ceil(Math.random() * 5), 200);
+
+  const keys = Object.keys(dPos);
+  // Shuffle a few positions for drama
+  for(let i = 0; i < 6; i++){
+    const a = keys[Math.floor(Math.random() * keys.length)];
+    const b = keys[Math.floor(Math.random() * keys.length)];
+    if(a !== b) [dPos[a], dPos[b]] = [dPos[b], dPos[a]];
+  }
+
+  // Advance each car's elapsed time at roughly lap speed
+  const baseLapTime = 30 + Math.random() * 2;
+  keys.forEach(d => {
+    dElapsed[d] = (dElapsed[d] || 0) + baseLapTime * (2000 / 1000); // ~2s poll
+  });
+
+  // Build leader elapsed time
+  const leaderName = keys.find(d => dPos[d] === 1);
+  const leaderET   = dElapsed[leaderName] || 0;
+
+  // Build vehicles array matching the real NASCAR API shape exactly
+  const vehicles = keys.map(d => {
+    const pos      = dPos[d];
+    const lapTime  = baseLapTime + (pos * 0.05); // slower cars = longer lap times
+    const isLeader = pos === 1;
+    const delta    = isLeader ? 0 : (pos - 1) * (0.3 + Math.random() * 0.4);
+    // ~15% chance of being "in pits" for non-leaders
+    const is_on_track = isLeader ? true : Math.random() > 0.15;
+
+    return {
+      driver: {
+        full_name:  d,
+        first_name: d.split(' ')[0],
+        last_name:  d.split(' ').slice(1).join(' '),
+      },
+      vehicle_number:       carData(d).n,
+      running_position:     pos,
+      laps_completed:       dLap,
+      last_lap_time:        lapTime,
+      last_lap_speed:       (3600 / lapTime * 1.5).toFixed(1), // mph approx
+      vehicle_elapsed_time: dElapsed[d],
+      status:               is_on_track ? 1 : 0,
+      is_on_track:          is_on_track,
+      delta:                is_on_track ? delta : -1,
+    };
+  });
+
+  updateGraphic({
+    lap_number:   dLap,
+    laps_in_race: 200,
+    run_name:     'Demo 500 — Your Picks',
+    flag_state:   dLap > 195 ? 8 : Math.random() < 0.08 ? 2 : 1,
+    vehicles,
+  });
+
+  document.getElementById('rts').textContent = 'Demo — ' + new Date().toLocaleTimeString();
 }
 
 // ══════════════════════════════════════════════════════════════
