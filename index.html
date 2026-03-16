@@ -226,7 +226,7 @@ select option{background:#1c1c1c}
 .flr{background:rgba(232,0,28,.1);color:var(--red);border:1px solid rgba(232,0,28,.2)}
 .flc{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.15)}
 .rts{margin-left:auto;font-size:10px;color:var(--mut)}
-.tarea{padding:12px 16px}
+.tarea{padding:12px 16px} 
 .tbg{background:#0e0e0e;border:1px solid var(--brd);border-radius:4px;overflow:hidden;position:relative}
 .tbg::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 44px,rgba(255,255,255,.02) 44px,rgba(255,255,255,.02) 45px);pointer-events:none}
 .fline{position:absolute;right:5%;top:0;bottom:0;width:2px;background:repeating-linear-gradient(180deg,#fff 0,#fff 5px,#000 5px,#000 10px);opacity:.25;pointer-events:none}
@@ -257,6 +257,69 @@ select option{background:#1c1c1c}
 .nrbox h3{font-family:var(--fh);font-size:20px;letter-spacing:2px;color:var(--y);margin-bottom:5px}
 .nrbox p{color:var(--mut);font-size:12px;max-width:280px;margin:0 auto 12px}
 
+/* ── OVAL TRACK ── */
+#oval-wrap{
+  position:relative;
+  width:100%;
+  padding-bottom:43.4%; /* 260/600 aspect ratio */
+  background:#0e0e0e;
+  border:1px solid var(--brd);
+  border-radius:4px;
+  overflow:hidden;
+}
+
+/* car badge on the oval */
+.oval-car{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  pointer-events:none;
+  will-change:transform,left,top;
+  z-index:10;
+  transition:opacity .3s;
+}
+.oval-car .oc-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:'Bebas Neue',sans-serif;font-style:italic;
+  font-size:13px;line-height:1;
+  min-width:26px;height:20px;padding:0 5px;
+  border-radius:2px;flex-shrink:0;letter-spacing:.5px;
+  box-shadow:0 0 10px var(--glow,#ffd100);
+}
+.oval-car .oc-name{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:9px;font-weight:700;
+  background:rgba(0,0,0,.75);
+  border-radius:2px;padding:0 3px;
+  white-space:nowrap;
+  max-width:60px;overflow:hidden;text-overflow:ellipsis;
+}
+.oval-car .oc-pos{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:10px;
+  opacity:.8;
+}
+/* leader glow pulse */
+.oval-car.leader .oc-badge{
+  animation:leader-pulse 1.5s ease-in-out infinite alternate;
+}
+@keyframes leader-pulse{
+  from{box-shadow:0 0 8px var(--glow,#ffd100)}
+  to  {box-shadow:0 0 18px var(--glow,#ffd100),0 0 4px #fff}
+}
+/* pit road car */
+.oval-car.pitted{
+  opacity:.5;
+}
+.oval-car.pitted .oc-badge{
+  filter:grayscale(.6);
+  box-shadow:none;
+}
+
+  
 /* ── DRIVER FORM PREVIEW ── */
 #drv-preview{display:flex;align-items:center;gap:8px}
 
@@ -423,16 +486,60 @@ alter table custom_drivers disable row level security;</div>
       <div class="flb flg" id="flg">🟢 GREEN</div>
       <div class="rts" id="rts">—</div>
     </div>
-    <div class="tarea"><div class="tbg" id="tbg"><div class="fline"></div></div></div>
-    <div class="sbar">
-      <div class="sb2"><span class="sv" id="sb1">—</span><div class="sl">Leader</div></div>
-      <div class="sb2"><span class="sv" id="sb2v">—</span><div class="sl">MPH</div></div>
-      <div class="sb2"><span class="sv" id="sb3">—</span><div class="sl">Running</div></div>
-      <div class="sb2"><span class="sv" id="sb4">—</span><div class="sl">Done</div></div>
+    <div class="tarea">
+      <div id="oval-wrap">
+        <svg id="oval-svg" viewBox="0 0 600 260"
+         preserveAspectRatio="xMidYMid meet"
+         style="position:absolute;inset:0;width:100%;height:100%">
+
+            <!-- asphalt surface -->
+            <ellipse cx="300" cy="130" rx="274" ry="112"
+                     fill="#1a1a1a" stroke="#111" stroke-width="1"/>
+            <!-- infield grass -->
+            <ellipse cx="300" cy="130" rx="218" ry="80"
+                     fill="#0d1a0d" stroke="#162416" stroke-width="1"/>
+            <!-- infield detail lines -->
+            <ellipse cx="300" cy="130" rx="218" ry="80"
+                     fill="none" stroke="#1c2e1c" stroke-width="2" stroke-dasharray="12 8"/>
+            <!-- SAFER barrier outer edge -->
+            <ellipse cx="300" cy="130" rx="276" ry="114"
+                     fill="none" stroke="#333" stroke-width="1.5"/>
+            <!-- white apron line -->
+            <ellipse cx="300" cy="130" rx="222" ry="83"
+                     fill="none" stroke="#2a2a2a" stroke-width="1"/>
+            <!-- pit road (bottom straight) -->
+            <rect x="74" y="230" width="152" height="14" rx="2"
+                  fill="#1c1c1c" stroke="#333" stroke-width="1"/>
+            <text x="150" y="240" text-anchor="middle"
+                  font-family="Bebas Neue,sans-serif" font-size="9"
+                  fill="#555" letter-spacing="1">PIT ROAD</text>
+            <!-- start / finish line -->
+            <rect x="291" y="15" width="18" height="8" fill="white" opacity="0.25" rx="1"/>
+            <rect x="291" y="15" width="9" height="4"  fill="white" opacity="0.5"/>
+            <rect x="300" y="19" width="9" height="4"  fill="black" opacity="0.5"/>
+            <text x="300" y="12" text-anchor="middle"
+                  font-family="Bebas Neue,sans-serif" font-size="8"
+                  fill="#555" letter-spacing="1">S/F</text>
+            <!-- lap direction arrow in infield -->
+            <path d="M 260 130 Q 300 100 340 130" fill="none" stroke="#1e3a1e" stroke-width="2"/>
+            <polygon points="340,130 332,124 336,133" fill="#1e3a1e"/>
+        </svg>
+
+        <!-- car badges rendered here by JS -->
+        <div id="oval-cars"
+             style="position:absolute;inset:0;pointer-events:none"></div>
+    
+        <!-- pit road badges rendered here -->
+        <div id="oval-pits"
+             style="position:absolute;bottom:6px;left:76px;
+                    display:flex;gap:4px;flex-wrap:wrap;
+                    max-width:152px;align-items:center;
+                    pointer-events:none"></div>
+      </div>
     </div>
-    <div id="dbnr" class="dbanner" style="display:none">🎮 <strong>Demo Mode</strong> — Simulated positions. Connect a live feed for real-time data.</div>
-  </div>
-</div>
+        <div id="dbnr" class="dbanner" style="display:none">🎮 <strong>Demo Mode</strong> — Simulated positions. Connect a live feed for real-time data.</div>
+      </div>
+    </div>
 
 <!-- RACES -->
 <div id="tab-races" class="tp">
@@ -1179,6 +1286,8 @@ function renderParticipants(){
   }).join('');
 }
 
+
+
 // ══════════════════════════════════════════════════════════════
 // ACTIONS (all async — write to Supabase, then loadAll)
 // ══════════════════════════════════════════════════════════════
@@ -1312,111 +1421,237 @@ function demoFrame(){
   document.getElementById('rts').textContent='Demo — '+new Date().toLocaleTimeString();
 }
 
-function stopFeed(){
-  if(feedInt)clearInterval(feedInt);feedInt=null;
-  document.getElementById('lpill').style.display='none';
-  document.getElementById('stopbtn').style.display='none';
+// ══════════════════════════════════════════════════════════════
+// OVAL TRACK ANIMATION ENGINE
+// ══════════════════════════════════════════════════════════════
+
+const OT = {
+  cars:     {},    // participantId → car state object
+  rafId:    null,
+  lastTs:   null,
+};
+
+// Convert 0-1 track fraction → {x%, y%} on the 600×260 SVG viewBox
+// fraction=0 is start/finish (top of front straight), CCW travel
+function ovalXY(frac) {
+  const cx = 300, cy = 130, rx = 247, ry = 97;
+  // CCW: angle goes positive as fraction increases, start at top (-π/2)
+  const angle = -frac * Math.PI * 2 - Math.PI / 2;
+  return {
+    px: (cx + rx * Math.cos(angle)) / 600 * 100,
+    py: (cy + ry * Math.sin(angle)) / 260 * 100,
+  };
+}
+
+// Calculate a car's fractional track position from live feed data
+// Returns value in [0, 1)
+function calcTrackFrac(v, leaderElapsed, leaderLapTime) {
+  if (!v.is_on_track) return null; // in pits
+
+  const lapTime = v.last_lap_time > 5 ? v.last_lap_time : (leaderLapTime || 30);
+
+  if (v.running_position === 1) {
+    // Leader: use elapsed time mod lap time
+    const frac = (v.vehicle_elapsed_time % lapTime) / lapTime;
+    return ((1 - frac) % 1 + 1) % 1; // invert because CCW: 0=S/F, increasing = forward
+  }
+
+  // delta = seconds behind leader on track (can be > lapTime if lapped)
+  const delta = v.delta >= 0 ? v.delta : (lapTime * 1.5); // treat -1 as ~1.5 laps behind
+  const leaderFrac = (1 - ((leaderElapsed % lapTime) / lapTime) + 1) % 1;
+  const carFrac = (leaderFrac - delta / lapTime % 1 + 2) % 1;
+  return carFrac;
+}
+
+function startOvalAnimation() {
+  if (OT.rafId) return;
+  OT.lastTs = null;
+  OT.rafId = requestAnimationFrame(ovalFrame);
+}
+
+function stopOvalAnimation() {
+  if (OT.rafId) cancelAnimationFrame(OT.rafId);
+  OT.rafId = null;
+}
+
+function ovalFrame(ts) {
+  if (!OT.lastTs) OT.lastTs = ts;
+  const dt = Math.min((ts - OT.lastTs) / 1000, 0.08); // cap at 80ms
+  OT.lastTs = ts;
+
+  for (const state of Object.values(OT.cars)) {
+    if (!state.isOnTrack || state.targetFrac === null) continue;
+
+    // Dead-reckon: advance at natural lap speed
+    const speed = 1 / (state.lapTime || 30); // fractions-per-second
+    state.displayFrac = (state.displayFrac + speed * dt + 1) % 1;
+
+    // Soft correction toward target (avoids snapping)
+    let diff = state.targetFrac - state.displayFrac;
+    if (diff >  0.5) diff -= 1;
+    if (diff < -0.5) diff += 1;
+
+    if (Math.abs(diff) > 0.12) {
+      // Hard re-sync if too far off (e.g. first data load)
+      state.displayFrac = state.targetFrac;
+    } else if (Math.abs(diff) > 0.005) {
+      // Gentle nudge — ~3% correction per frame
+      state.displayFrac = ((state.displayFrac + diff * 0.03) + 1) % 1;
+    }
+  }
+
+  renderOvalCars();
+  OT.rafId = requestAnimationFrame(ovalFrame);
+}
+
+function renderOvalCars() {
+  const carsEl = document.getElementById('oval-cars');
+  const pitsEl = document.getElementById('oval-pits');
+  if (!carsEl || !pitsEl) return;
+
+  const onTrack = Object.values(OT.cars).filter(s => s.isOnTrack)
+    .sort((a, b) => a.pos - b.pos);
+  const inPits  = Object.values(OT.cars).filter(s => !s.isOnTrack)
+    .sort((a, b) => a.pos - b.pos);
+
+  // Render on-track cars
+  carsEl.innerHTML = onTrack.map(state => {
+    const {px, py} = ovalXY(state.displayFrac);
+    const isLd = state.pos === 1;
+    const c = state.color;
+    return `<div class="oval-car${isLd?' leader':''}"
+                 style="left:${px.toFixed(2)}%;top:${py.toFixed(2)}%">
+      <span class="oc-pos" style="color:${c}">P${state.pos}</span>
+      <span class="oc-badge ${state.carCls}"
+            style="background:${state.carBg};color:${state.carFg};--glow:${state.carBg}"
+      >${state.carNum}</span>
+      <span class="oc-name" style="color:${c}">${state.partName}</span>
+    </div>`;
+  }).join('');
+
+  // Render pit road cars
+  pitsEl.innerHTML = inPits.map(state => {
+    return `<div class="oval-car pitted" style="position:relative;transform:none;left:auto;top:auto">
+      <span class="oc-badge ${state.carCls}"
+            style="background:${state.carBg};color:${state.carFg};font-size:10px;height:16px;min-width:20px"
+      >${state.carNum}</span>
+      <span class="oc-name" style="color:${state.color}">${state.partName}</span>
+    </div>`;
+  }).join('');
+}
+  
+function stopFeed() {
+  if (feedInt) clearInterval(feedInt);
+  feedInt = null;
+  stopOvalAnimation();
+  OT.cars = {}; // reset car states
+  document.getElementById('lpill').style.display = 'none';
+  document.getElementById('stopbtn').style.display = 'none';
 }
 function showTrack(){document.getElementById('lrw').style.display='block';}
 
-function updateGraphic(data){
-  // Field mapping for cf.nascar.com API
-  const lap    = data.lap_number;
-  const tot    = data.laps_in_race;
-  const rname  = data.run_name;
-  const fs     = data.flag_state || 1;
-  const vs     = data.vehicles   || [];
+// ══════════════════════════════════════════════════════════════
+// UPDATED updateGraphic — now feeds the oval animation engine
+// ══════════════════════════════════════════════════════════════
+function updateGraphic(data) {
+  const lap   = data.lap_number;
+  const tot   = data.laps_in_race;
+  const rname = data.run_name;
+  const fs    = data.flag_state || 1;
+  const vs    = data.vehicles   || [];
 
   document.getElementById('lrname').textContent = rname || 'Live Race';
   document.getElementById('lcl').textContent    = lap   || '—';
   document.getElementById('ltl').textContent    = tot   || '—';
-
   const flg = document.getElementById('flg');
   flg.textContent = FL[fs] || '—';
   flg.className   = FC[fs] || 'flb flg';
 
-  // Sort by running_position (not position)
-  const sorted = [...vs].sort((a,b) => (a.running_position||999) - (b.running_position||999));
+  const sorted = [...vs].sort((a,b) =>
+    (a.running_position||999) - (b.running_position||999));
   const leader = sorted[0];
 
-  document.getElementById('sb1').textContent  = leader ? last(leader.driver.full_name) : '—';
-  // Use last_lap_speed; leader delta is 0 so show speed
-  document.getElementById('sb2v').textContent = leader && leader.last_lap_speed
-    ? parseFloat(leader.last_lap_speed).toFixed(0) : '—';
-  // status === 1 means running (it's numeric, not a string)
-  document.getElementById('sb3').textContent  = vs.filter(v => v.status === 1).length || vs.length;
-  document.getElementById('sb4').textContent  = tot && lap ? Math.round(lap/tot*100)+'%' : '—';
+  document.getElementById('sb1').textContent =
+    leader ? last(leader.driver.full_name) : '—';
+  document.getElementById('sb2v').textContent =
+    leader?.last_lap_speed ? parseFloat(leader.last_lap_speed).toFixed(0) : '—';
+  document.getElementById('sb3').textContent =
+    vs.filter(v => v.status === 1).length || vs.length;
+  document.getElementById('sb4').textContent =
+    tot && lap ? Math.round(lap/tot*100)+'%' : '—';
 
+  // ── No picks linked ──
   const picks = linkedPicks();
-  const tbg   = document.getElementById('tbg');
+  const wrap  = document.getElementById('oval-wrap');
+  if (!wrap) return;
 
-  if(!picks.length){
-    tbg.innerHTML=`<div class="fline"></div><div class="nrbox"><span class="bi">🎯</span><h3>No Picks Linked</h3><p>Link a race above so participants' drivers appear on track.</p></div>`;
+  if (!picks.length) {
+    document.getElementById('oval-cars').innerHTML =
+      `<div style="position:absolute;inset:0;display:flex;align-items:center;
+                   justify-content:center;color:var(--mut);font-size:13px;
+                   font-family:var(--fb)">
+         Link a race above to see your participants on track
+       </div>`;
+    document.getElementById('oval-pits').innerHTML = '';
     return;
   }
 
-  const total = sorted.length || 36;
+  // ── Calculate target positions for each participant's best driver ──
+  const leaderV   = vs.find(v => v.running_position === 1);
+  const leaderET  = leaderV?.vehicle_elapsed_time || 0;
+  const leaderLT  = leaderV?.last_lap_time || 30;
 
-  const lanes = picks.map(({participant, drivers}) => {
-    // Match on driver.full_name instead of driver_name
-    const dvs = drivers.map(d => {
-      const v = vs.find(x => fuzzy(x.driver.full_name, d));
-      return { driver:d, v, pos: v ? v.running_position : null };
-    }).sort((a,b) => (a.pos||9999) - (b.pos||9999));
+  for (const {participant, drivers} of picks) {
+    // Find best-positioned driver for this participant
+    const dvs = drivers
+      .map(d => ({
+        driver: d,
+        v: vs.find(x => fuzzy(x.driver.full_name, d))
+      }))
+      .filter(x => x.v)
+      .sort((a,b) => (a.v.running_position||999) - (b.v.running_position||999));
 
-    const best  = dvs[0];
-    const pos   = best.pos;
-    const pct    = pos ? ((total - pos) / (total - 1)) : 0;
-    const isMob  = window.innerWidth <= 640;
-    const margin = isMob ? 12 : 8;   // bigger safe zone on mobile
-    const range  = isMob ? 76 : 84;  // narrower usable range on mobile
-    const left   = margin + pct * range;
-    const isLd  = pos === 1;
-    const c     = AVC[S.participants.findIndex(x => x.id === participant.id) % AVC.length];
-    const lbl   = pos ? `P${pos}` : best.v ? 'OUT' : '?';
+    if (!dvs.length) continue;
+    const best = dvs[0];
+    const v    = best.v;
+    const cd   = carData(best.driver);
+    const c    = AVC[S.participants.findIndex(x => x.id === participant.id) % AVC.length];
+    const key  = participant.id;
 
-    // Delta: 0 = leader, -1 = lapped, otherwise seconds back
-    const deltaVal = best.v ? best.v.delta : null;
-    const gapText  = isLd && best.v
-      ? parseFloat(best.v.last_lap_speed||0).toFixed(0)+' mph'
-      : deltaVal != null && deltaVal >= 0
-        ? '+'+deltaVal.toFixed(3)+'s'
-        : deltaVal === -1 ? 'LAPPED' : '';
+    const targetFrac = calcTrackFrac(v, leaderET, leaderLT);
 
-    return `<div class="lane ${isLd?'ld':''}">
-      <div class="li">
-        <span class="av" style="background:${c}22;color:${c};border:1px solid ${c}44;width:24px;height:24px;font-size:12px">${participant.name[0]}</span>
-        <div>
-          <div class="ln" style="color:${c}">${participant.name}</div>
-          <div class="ld2">${dvs.map(x=>`<span class="nbadge ${carData(x.driver).cls}" style="background:${carData(x.driver).bg};color:${carData(x.driver).fg};font-size:9px;height:14px;min-width:18px;margin-right:1px">${carData(x.driver).n}</span>`).join('')}</div>
-        </div>
-      </div>
-      <div class="ltrack"><div class="tline"></div>
-        <div class="cm" style="left:${left.toFixed(1)}%;color:${c}">
-          <span class="ci mv" style="font-size:inherit;filter:none">
-            <span class="nbadge ${carData(best.driver).cls}" style="
-              background:${carData(best.driver).bg};
-              color:${carData(best.driver).fg};
-              font-size:15px;
-              min-width:32px;
-              height:26px;
-              border-radius:3px;
-              box-shadow:0 0 8px ${carData(best.driver).bg}99;
-            ">${carData(best.driver).n}</span>
-          </span>
-          <span class="cpb" style="border-color:${c};color:${c}">${lbl}</span>
-        </div>
-      </div>
-      <div class="ls">
-        <div class="lpos" style="color:${isLd?'var(--y)':'var(--txt)'}">${lbl}</div>
-        <div class="lgap">${gapText}</div>
-      </div>
-    </div>`;
-  }).join('');
+    if (!OT.cars[key]) {
+      // First time — initialise display position to target
+      OT.cars[key] = {
+        displayFrac: targetFrac !== null ? targetFrac : 0,
+        targetFrac:  targetFrac,
+        lapTime:     v.last_lap_time || 30,
+        isOnTrack:   v.is_on_track,
+        pos:         v.running_position,
+        carNum:      cd.n,
+        carBg:       cd.bg,
+        carFg:       cd.fg,
+        carCls:      cd.cls,
+        color:       c,
+        partName:    participant.name,
+      };
+    } else {
+      // Update targets — display position advances smoothly via rAF
+      const state = OT.cars[key];
+      state.targetFrac = targetFrac;
+      state.lapTime    = v.last_lap_time > 5 ? v.last_lap_time : state.lapTime;
+      state.isOnTrack  = v.is_on_track;
+      state.pos        = v.running_position;
+      state.carNum     = cd.n;
+      state.carBg      = cd.bg;
+      state.carFg      = cd.fg;
+      state.color      = c;
+    }
+  }
 
-  tbg.innerHTML = `<div class="fline"></div>${lanes}`;
+  // Kick off animation loop if not already running
+  startOvalAnimation();
 }
-
 function last(n){if(!n)return'—';const p=n.split(' ');return p.length>1?p[p.length-1]:n;}
 function fuzzy(a='',b=''){a=a.toLowerCase().trim();b=b.toLowerCase().trim();if(a===b)return true;return a.split(' ').pop()===b.split(' ').pop();}
 
